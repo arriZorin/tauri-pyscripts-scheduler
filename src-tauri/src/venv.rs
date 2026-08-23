@@ -382,6 +382,37 @@ pub fn read_requirements_txt(dir_path: &str) -> Result<Vec<String>, String> {
         .collect();
     Ok(lines)
 }
+/// Runs `uv sync` in the script folder for pyproject.toml-based projects.
+///
+/// Unlike `sync_deps` which uses `uv pip install --requirement`, this runs
+/// `uv sync` directly in the folder so uv reads `pyproject.toml` and resolves
+/// all declared dependencies. No hash caching is needed — uv itself detects
+/// changes to `pyproject.toml` and the lockfile.
+pub fn sync_project(
+    app_data: &Path,
+    folder_dir: &Path,
+    python_version: &str,
+    uv_path: Option<&str>,
+) -> Result<(), String> {
+    let uv = uv_path.unwrap_or("uv.exe");
+
+    // Ensure .venv is healthy first
+    ensure_venv(app_data, folder_dir, python_version, uv_path)?;
+
+    let output = std::process::Command::new(uv)
+        .args(["sync", "--python", python_version, "--quiet"])
+        .current_dir(folder_dir)
+        .output()
+        .map_err(|e| format!("failed to start uv sync: {}", e))?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!("uv sync failed: {}", stderr.trim()))
+    }
+}
+
 pub fn read_deps_hash(app_data: &Path, folder_hash: &str) -> Result<String, String> {
     let path = deps_hash_file_path(app_data, folder_hash);
     let content = fs::read_to_string(&path)

@@ -645,7 +645,7 @@ pub fn create_task(spec: &CreateTaskSpec) -> Result<String, String> {
         unsafe { (*folder).Release() };
         return Err(format!("failed to get registration info: 0x{hr:08x}"));
     }
-    let author = wide("Scripts Management");
+    let author = wide("PyscriptScheduler");
     let hr = unsafe { (*registration).put_Author(author.as_ptr() as *mut u16) };
     unsafe { (*registration).Release() };
     if hr < 0 {

@@ -325,14 +325,22 @@ async function confirmDeps() {
   const { folder, script, detected } = pendingDeps.value;
   pendingDeps.value = null;
   try {
-    await invoke('write_requirements_txt', { dirPath: folder, deps: detected });
-    // Ensure the venv exists in the script folder for this folder's pythonVersion
-    await invoke('ensure_script_venv', { dirPath: folder, pythonVersion: script.pythonVersion ?? '3.11' });
-    // Sync the deps from requirements.txt into the venv
-    await invoke('sync_script_deps', { dirPath: folder, requirements: detected });
-    operationSummary.value = `Created requirements.txt with ${detected.length} dep(s).`;
+    // Check for pyproject.toml — if present, use uv sync (project mode)
+    const hasPyproject = await invoke<boolean>('path_exists', { path: folder + '/pyproject.toml' });
+    if (hasPyproject) {
+      await invoke('ensure_script_venv', { dirPath: folder, pythonVersion: script.pythonVersion ?? '3.11' });
+      await invoke('uv_sync_project', { dirPath: folder, pythonVersion: script.pythonVersion ?? '3.11' });
+      operationSummary.value = `Synced uv project in ${folder} with ${detected.length} dep(s).`;
+    } else {
+      await invoke('write_requirements_txt', { dirPath: folder, deps: detected });
+      // Ensure the venv exists in the script folder for this folder's pythonVersion
+      await invoke('ensure_script_venv', { dirPath: folder, pythonVersion: script.pythonVersion ?? '3.11' });
+      // Sync the deps from requirements.txt into the venv
+      await invoke('sync_script_deps', { dirPath: folder, requirements: detected });
+      operationSummary.value = `Created requirements.txt with ${detected.length} dep(s).`;
+    }
   } catch (e) {
-    error.value = typeof e === 'string' && e.trim() ? e : e instanceof Error ? e.message : 'Failed to create requirements.txt.';
+    error.value = typeof e === 'string' && e.trim() ? e : e instanceof Error ? e.message : 'Failed to process dependencies.';
   }
 }
 
@@ -348,10 +356,16 @@ function skipDeps() {
 async function handleAddFile() {
   const result = await addScriptFile();
   if (result.added > 0) {
-    // Auto-scan for deps on newly added scripts (only if no requirements.txt)
+    // Auto-scan for deps on newly added scripts
     for (const s of scripts.value) {
       try {
         const folder = scriptDir(s.path);
+        // If pyproject.toml exists, this is a uv project — skip deps scan, just sync
+        const hasPyproject = await invoke<boolean>('path_exists', { path: folder + '/pyproject.toml' });
+        if (hasPyproject) {
+          await venvSync.syncFolder(s.path, s.pythonVersion ?? '3.11');
+          continue;
+        }
         const existing = await invoke<string[]>('read_folder_requirements', { dirPath: folder });
         if (existing.length === 0) {
           const detected = await invoke<string[]>('scan_script_deps', { filePath: s.path });
@@ -373,6 +387,12 @@ async function handleAddFolder() {
     for (const s of scripts.value) {
       try {
         const folder = scriptDir(s.path);
+        // If pyproject.toml exists, this is a uv project — skip deps scan
+        const hasPyproject = await invoke<boolean>('path_exists', { path: folder + '/pyproject.toml' });
+        if (hasPyproject) {
+          await venvSync.syncFolder(s.path, s.pythonVersion ?? '3.11');
+          continue;
+        }
         const existing = await invoke<string[]>('read_folder_requirements', { dirPath: folder });
         if (existing.length === 0) {
           const detected = await invoke<string[]>('scan_script_deps', { filePath: s.path });

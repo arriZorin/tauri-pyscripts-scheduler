@@ -421,6 +421,30 @@ fn write_requirements_txt(dir_path: String, deps: Vec<String>) -> Result<(), Str
         .map_err(|e| format!("failed to write requirements.txt: {}", e))
 }
 
+#[tauri::command]
+fn uv_sync_project(
+    state: tauri::State<'_, AppDataDir>,
+    dir_path: String,
+    python_version: String,
+) -> Result<String, String> {
+    let dir = std::path::Path::new(&dir_path);
+    if !dir.is_dir() {
+        return Err(format!("directory not found: {}", dir_path));
+    }
+    if python_version.is_empty() {
+        return Err("python_version cannot be empty".to_string());
+    }
+    // Validate path safety
+    if dir_path.contains("..") || dir_path.contains('\0') {
+        return Err("invalid directory path".to_string());
+    }
+
+    venv::sync_project(&state.0, dir, &python_version, None)?;
+    // Return venv python path for consistency with ensure_script_venv
+    let py_path = venv::venv_python_path(dir);
+    Ok(py_path.to_string_lossy().to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -449,6 +473,7 @@ pub fn run() {
             read_folder_requirements,
             scan_script_deps,
             write_requirements_txt,
+            uv_sync_project,
             systeminfo::run_process,
             systeminfo::find_all_in_path_command,
             systeminfo::query_python_registry,

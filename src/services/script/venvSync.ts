@@ -15,6 +15,14 @@ export class TauriVenvSync implements VenvSync {
   async syncFolder(scriptPath: string, pythonVersion: string): Promise<void> {
     const workingDir = scriptDir(scriptPath)
 
+    // Check for pyproject.toml — if present, use uv sync (project mode)
+    const hasPyproject = await invoke<boolean>('path_exists', { path: workingDir + '/pyproject.toml' })
+    if (hasPyproject) {
+      await invoke('ensure_script_venv', { dirPath: workingDir, pythonVersion })
+      await invoke('uv_sync_project', { dirPath: workingDir, pythonVersion })
+      return
+    }
+
     // Read requirements.txt from the script folder (or empty if not found)
     const requirements = await invoke<string[]>('read_folder_requirements', { dirPath: workingDir })
 
