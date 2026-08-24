@@ -35,6 +35,14 @@ const stats = ref<DashboardStats>({
   successRuns: 0,
   failedRuns: 0,
   successRate: 0,
+  nextRunAt: null,
+  nextRunName: null,
+  lastRunAt: null,
+  lastRunName: null,
+  lastRunStatus: null,
+  runsToday: 0,
+  scheduleSummary: '',
+  pythonSummary: '',
 });
 const tasks = ref<Task[]>([]);
 const recentRuns = ref<TaskRun[]>([]);
@@ -136,6 +144,7 @@ onMounted(() => {
               <div class="stat-title">Total Scripts</div>
               <div class="stat-value text-primary">{{ stats.totalScripts }}</div>
               <div class="stat-desc">{{ stats.usedScripts }} used · {{ stats.unusedScripts }} unused</div>
+              <div v-if="stats.pythonSummary" class="stat-desc text-xs opacity-60">{{ stats.pythonSummary }}</div>
             </button>
 
             <button type="button" class="stat cursor-pointer border-0 bg-transparent text-left transition hover:bg-base-200 focus-visible:outline-2 focus-visible:outline-offset-2" data-testid="stat-tasks" aria-label="Open Task" @click="onNavigate?.('task')">
@@ -147,6 +156,7 @@ onMounted(() => {
               <div class="stat-title">Total Tasks</div>
               <div class="stat-value text-secondary">{{ stats.totalTasks }}</div>
               <div class="stat-desc">{{ stats.enabledTasks }} enabled · {{ stats.totalTasks - stats.enabledTasks }} disabled</div>
+              <div v-if="stats.scheduleSummary" class="stat-desc text-xs opacity-60">{{ stats.scheduleSummary }}</div>
             </button>
 
             <button type="button" class="stat cursor-pointer border-0 bg-transparent text-left transition hover:bg-base-200 focus-visible:outline-2 focus-visible:outline-offset-2" data-testid="stat-runs" aria-label="Open Logging" @click="onNavigate?.('logging')">
@@ -157,7 +167,33 @@ onMounted(() => {
               </div>
               <div class="stat-value">{{ stats.totalRuns > 0 ? `${stats.successRate}%` : '—' }}</div>
               <div class="stat-title">Success rate</div>
-              <div class="stat-desc text-secondary">{{ stats.successRuns }} of {{ stats.totalRuns }} runs succeeded</div>
+              <div class="stat-desc">{{ stats.successRuns }} of {{ stats.totalRuns }} runs succeeded</div>
+              <div v-if="stats.lastRunName" class="stat-desc text-xs opacity-60">Last: {{ stats.lastRunName }} ({{ stats.lastRunStatus }})</div>
+            </button>
+          </div>
+
+          <div class="stats shadow w-full mt-4" data-testid="dashboard-stats-secondary">
+            <button type="button" class="stat cursor-pointer border-0 bg-transparent text-left transition hover:bg-base-200 focus-visible:outline-2 focus-visible:outline-offset-2" data-testid="stat-next-run" aria-label="Open Task" @click="onNavigate?.('task')">
+              <div class="stat-figure text-secondary">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block h-8 w-8 stroke-current">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div class="stat-title">Next Run</div>
+              <div class="stat-value text-sm font-medium">{{ stats.nextRunName ?? '—' }}</div>
+              <div v-if="stats.nextRunAt" class="stat-desc">{{ formatRunDate(stats.nextRunAt) }}</div>
+              <div v-else class="stat-desc">No upcoming runs</div>
+            </button>
+
+            <button type="button" class="stat cursor-pointer border-0 bg-transparent text-left transition hover:bg-base-200 focus-visible:outline-2 focus-visible:outline-offset-2" data-testid="stat-runs-today" aria-label="Open Logging" @click="onNavigate?.('logging')">
+              <div class="stat-figure text-secondary">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block h-8 w-8 stroke-current">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+              <div class="stat-title">Runs Today</div>
+              <div class="stat-value">{{ stats.runsToday }}</div>
+              <div class="stat-desc">executions since midnight</div>
             </button>
           </div>
           <div class="divider"></div>
