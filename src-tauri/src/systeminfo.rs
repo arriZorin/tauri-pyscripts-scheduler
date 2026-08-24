@@ -262,6 +262,63 @@ pub fn delete_file(path: String) -> Result<(), String> {
     std::fs::remove_file(&path).map_err(|e| format!("failed to delete '{path}': {e}"))
 }
 
+#[tauri::command]
+pub fn get_disk_free_space(path: String) -> Result<u64, String> {
+    if path.is_empty() {
+        return Err("path cannot be empty".to_string());
+    }
+    #[cfg(windows)]
+    {
+        use std::ffi::OsStr;
+        use std::os::windows::ffi::OsStrExt;
+        use std::mem::MaybeUninit;
+        use winapi::um::fileapi::GetDiskFreeSpaceExW;
+        use winapi::um::winnt::ULARGE_INTEGER;
+
+        let wide_path: Vec<u16> = OsStr::new(&path)
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+
+        unsafe {
+            let mut free_bytes: ULARGE_INTEGER = MaybeUninit::zeroed().assume_init();
+            let ret = GetDiskFreeSpaceExW(
+                wide_path.as_ptr(),
+                &mut free_bytes as *mut ULARGE_INTEGER,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            );
+            if ret == 0 {
+                return Err("failed to query disk free space".to_string());
+            }
+            Ok(*free_bytes.QuadPart())
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        // Fallback: use the `statvfs` approach via path
+        let p = std::path::Path::new(&path);
+        // Try to get the mount point ancestor
+        let mount = if p.is_dir() { p } else { p.parent().unwrap_or(p) };
+        #[cfg(target_os = "linux")]
+        {
+            use std::mem::MaybeUninit;
+            use std::ffi::CString;
+            let cpath = CString::new(mount.to_string_lossy().as_ref()).map_err(|_| "invalid path".to_string())?;
+            let mut stat: libc::statvfs = unsafe { MaybeUninit::zeroed().assume_init() };
+            let ret = unsafe { libc::statvfs(cpath.as_ptr(), &mut stat) };
+            if ret != 0 {
+                return Err("failed to query disk free space".to_string());
+            }
+            Ok(stat.f_frsize as u64 * stat.f_bavail as u64)
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            Err("disk free space not supported on this platform".to_string())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

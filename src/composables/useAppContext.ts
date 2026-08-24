@@ -20,7 +20,7 @@ import { AppLogger } from '../services/log/AppLogger'
 import { TaskRunRecorder } from '../services/task/TaskRunRecorder'
 import { TauriFileStorage } from '../services/shared/TauriFileStorage'
 import { TauriVenvSync, type VenvSync } from '../services/script/venvSync'
-import { tauriSystemInfoService, type SystemInfoService } from '../services/home/systemInfo'
+import { tauriHostHealthService, type HostHealthService } from '../services/home/hostHealth'
 import { tauriScriptPathChecker, type ScriptPathChecker } from '../services/script/scriptPathChecker'
 import { createRuntimeRequirement } from '../services/runtimeCheck/createRuntimeRequirement'
 import type { RuntimeRequirement } from '../services/runtimeCheck/types'
@@ -36,7 +36,7 @@ export interface AppContext {
   taskRunRecorder: TaskRunRecorder
   picker: ScriptPicker
   scanner: FileScanner
-  systemInfo: SystemInfoService
+  hostHealth: HostHealthService
   scriptPathChecker: ScriptPathChecker
   runtimeRequirement: RuntimeRequirement
   venvSync: VenvSync
@@ -66,7 +66,7 @@ export function createAppContext(overrides: Partial<AppContext> = {}): AppContex
     taskRunRecorder: overrides.taskRunRecorder ?? new TaskRunRecorder(taskRunRepository),
     picker: overrides.picker ?? new TauriScriptPicker(),
     scanner: overrides.scanner ?? new TauriFileScanner(),
-    systemInfo: overrides.systemInfo ?? tauriSystemInfoService,
+    hostHealth: overrides.hostHealth ?? tauriHostHealthService,
     scriptPathChecker: overrides.scriptPathChecker ?? tauriScriptPathChecker,
     runtimeRequirement: overrides.runtimeRequirement ?? createRuntimeRequirement(),
     venvSync: overrides.venvSync ?? new TauriVenvSync(scriptRepository),

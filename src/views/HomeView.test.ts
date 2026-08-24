@@ -4,8 +4,8 @@ import HomeView from './HomeView.vue'
 import { appContextKey, createAppContext } from '../composables/useAppContext'
 import type { Task } from '../models/Task'
 import type { TaskRun } from '../models/TaskRun'
-import type { SystemInfo } from '../services/home/systemInfo'
 import type { RequirementCheckResult, RuntimeRequirement } from '../services/runtimeCheck/types'
+import type { HostHealthResult } from '../services/home/hostHealth'
 
 function task(id: string, name: string): Task {
   return {
@@ -58,6 +58,7 @@ const emptyOverrides = {
   scriptRepository: { list: async () => [] } as never,
   taskRepository: { list: async () => [] } as never,
   taskRunRepository: { list: async () => [] } as never,
+  hostHealth: { check: async (): Promise<HostHealthResult> => ({ items: [], status: 'ok' }) } as never,
 }
 
 async function mountHome(overrides: Record<string, unknown>, extraProps: Record<string, unknown> = {}) {
@@ -105,34 +106,18 @@ describe('HomeView recent executions', () => {
     document.body.removeChild(container)
   })
 
-  it('hides Resolve now when the host matches the app lock version', async () => {
-    const systemInfo: SystemInfo = { appVersion: '0.1.0', hostVersion: '0.1.0', status: 'matched' }
+  it('renders host health checks in the health card', async () => {
     const { container, app } = await mountHome({
       ...emptyOverrides,
-      systemInfo: { load: async () => systemInfo },
       runtimeRequirement: fakeRuntimeRequirement(runtimeResult('met')),
     })
 
-    expect(container.querySelector('[data-testid="system-info"]')?.textContent).toContain('Matched')
-    expect(container.querySelector('[data-testid="resolve-system-info"]')).toBeNull()
-
-    app.unmount()
-    document.body.removeChild(container)
-  })
-
-  it('shows Resolve now and navigates to Settings when the host differs', async () => {
-    const systemInfo: SystemInfo = { appVersion: '0.1.0', hostVersion: '0.2.0', status: 'mismatch' }
-    const navigated: string[] = []
-    const { container, app } = await mountHome({
-      ...emptyOverrides,
-      systemInfo: { load: async () => systemInfo },
-      runtimeRequirement: fakeRuntimeRequirement(runtimeResult('met')),
-    }, { onNavigate: (viewId: string) => navigated.push(viewId) })
-
-    const resolveButton = container.querySelector('[data-testid="resolve-system-info"]') as HTMLButtonElement
-    expect(resolveButton).not.toBeNull()
-    resolveButton.click()
-    expect(navigated).toEqual(['setting'])
+    // The health card should render (it runs checkHostHealth async in loadStats)
+    await nextTick()
+    await nextTick()
+    const healthCard = container.querySelector('[data-testid="host-health"]')
+    expect(healthCard).toBeTruthy()
+    expect(healthCard?.textContent).toContain('Host Health')
 
     app.unmount()
     document.body.removeChild(container)

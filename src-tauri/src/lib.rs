@@ -480,7 +480,8 @@ pub fn run() {
             systeminfo::default_uv_install_dir,
             systeminfo::download_to_file,
             systeminfo::extract_zip,
-            systeminfo::delete_file
+            systeminfo::delete_file,
+            systeminfo::get_disk_free_space
         ])
         .setup(|app| {
             let dir = app.path().app_local_data_dir()?;

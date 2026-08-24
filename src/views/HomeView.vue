@@ -5,8 +5,8 @@ import type { Script } from '../models/Script';
 import type { Task } from '../models/Task';
 import type { TaskRun } from '../models/TaskRun';
 import { computeDashboardStats, type DashboardStats } from '../services/home/dashboardStats';
-import type { SystemInfo } from '../services/home/systemInfo';
 import type { RequirementCheckResult } from '../services/runtimeCheck/types';
+import type { HostHealthResult } from '../services/home/hostHealth';
 
 interface Props {
   onNavigate?: (viewId: string) => void;
@@ -19,7 +19,7 @@ const {
   scriptRepository,
   taskRepository,
   taskRunRepository,
-  systemInfo: systemInfoService,
+  hostHealth,
   runtimeRequirement,
   runtimeCheckResult,
   logger,
@@ -46,7 +46,7 @@ const stats = ref<DashboardStats>({
 });
 const tasks = ref<Task[]>([]);
 const recentRuns = ref<TaskRun[]>([]);
-const systemInfo = ref<SystemInfo | null>(null);
+const hostHealthResult = ref<HostHealthResult | null>(null);
 const loaded = ref(false);
 // Runtime result is read from the reactive context ref set once at startup
 // (App.vue).  No locator probe runs when this view mounts.
@@ -54,18 +54,18 @@ const runtimeResult = computed(() => runtimeCheckResult.value);
 const runtimeResolving = ref(false);
 
 async function loadStats() {
-  const [scripts, loadedTasks, runs, loadedSystemInfo]: [Script[], Task[], TaskRun[], SystemInfo | null] = await Promise.all([
+  const [scripts, loadedTasks, runs, health]: [Script[], Task[], TaskRun[], HostHealthResult | null] = await Promise.all([
     scriptRepository.list().catch(() => [] as Script[]),
     taskRepository.list().catch(() => [] as Task[]),
     taskRunRepository.list().catch(() => [] as TaskRun[]),
-    systemInfoService.load().catch(() => null),
+    hostHealth.check().catch(() => null),
   ]);
   tasks.value = loadedTasks;
   recentRuns.value = [...runs]
     .sort((left, right) => Date.parse(right.startedAt) - Date.parse(left.startedAt))
     .slice(0, 5);
   stats.value = computeDashboardStats(scripts, loadedTasks, runs);
-  systemInfo.value = loadedSystemInfo;
+  hostHealthResult.value = health;
   loaded.value = true;
 }
 
@@ -197,30 +197,25 @@ onMounted(() => {
             </button>
           </div>
           <div class="divider"></div>
-          <section class="card border border-base-300 bg-base-100 shadow-sm" data-testid="system-info">
+          <section class="card border border-base-300 bg-base-100 shadow-sm" data-testid="host-health">
             <div class="card-body">
               <div class="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <h2 class="card-title">System Info</h2>
-                  <p class="text-sm opacity-70">Host configuration compared with the app lock version.</p>
+                  <h2 class="card-title">Host Health</h2>
+                  <p class="text-sm opacity-70">Environment checks that could affect app behaviour.</p>
                 </div>
-                <span v-if="systemInfo?.status === 'matched'" class="badge badge-success">Matched</span>
-                <span v-else-if="systemInfo?.status === 'mismatch'" class="badge badge-warning">Mismatch</span>
-                <span v-else-if="systemInfo" class="badge badge-error">Unavailable</span>
-                <span v-else class="loading loading-spinner loading-sm" aria-label="Checking system info"></span>
+                <span v-if="!hostHealthResult" class="loading loading-spinner loading-sm" aria-label="Checking host health"></span>
+                <span v-else-if="hostHealthResult.status === 'ok'" class="badge badge-success">All ok</span>
+                <span v-else-if="hostHealthResult.status === 'warning'" class="badge badge-warning">Warnings</span>
+                <span v-else class="badge badge-error">Failing</span>
               </div>
-              <div class="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <div class="text-xs uppercase opacity-60">Host status</div>
-                  <div class="font-medium">{{ systemInfo?.hostVersion ?? 'Unable to read host version' }}</div>
+              <div v-if="hostHealthResult" class="mt-3 space-y-2">
+                <div v-for="(item, idx) in hostHealthResult.items" :key="idx" class="flex items-center gap-2 text-sm" :data-testid="`health-${item.label.toLowerCase().replace(/\s+/g, '-')}`">
+                  <span v-if="item.ok" class="text-green-600">&#10003;</span>
+                  <span v-else class="text-red-600">&#10007;</span>
+                  <span class="font-medium">{{ item.label }}:</span>
+                  <span class="opacity-70">{{ item.detail }}</span>
                 </div>
-                <div>
-                  <div class="text-xs uppercase opacity-60">App lock version</div>
-                  <div class="font-medium">{{ systemInfo?.appVersion ?? 'Checking...' }}</div>
-                </div>
-              </div>
-              <div v-if="systemInfo && systemInfo.status !== 'matched'" class="card-actions justify-end">
-                <button type="button" class="btn btn-primary btn-sm" data-testid="resolve-system-info" @click="onNavigate?.('setting')">Resolve now</button>
               </div>
               <div class="divider my-2"></div>
               <div data-testid="runtime-requirement">
