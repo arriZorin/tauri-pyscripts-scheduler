@@ -1,7 +1,7 @@
 # Fresh-Start-App Workflow
 
 **Project:** `tauri-pyscripts-scheduler`  
-**Date:** 2026-08-22  
+**Date:** 2026-08-24  
 **Status:** ✅ Implemented — frontend boot orchestration over existing Rust commands (no dedicated fresh-start command required)
 
 ---
@@ -312,7 +312,7 @@ onMounted(() => { loadStats(); });
 **Behaviour:**
 
 1. Parallel repository reads — each hits `read_text_file`; a missing file returns `null` (`lib.rs:112-116`), so each repository yields `[]`.
-2. `computeDashboardStats` (`dashboardStats.ts:21-39`) aggregates totals — all zeros on a fresh start.
+2. `computeDashboardStats` (`dashboardStats.ts:23-45`) aggregates totals — all zeros on a fresh start. The interface now tracks `usedScripts`/`unusedScripts` by cross-referencing task `scriptId` values against script `id` values. A `usedScriptIds` set (`dashboardStats.ts:28`) collects all IDs referenced by at least one task, then `usedScripts = scripts.filter(s => usedScriptIds.has(s.id)).length` and `unusedScripts = scripts.length - usedScripts`.
 3. `systemInfoService.load()` (`systemInfo.ts:29-35`) compares `package.json` version against `getVersion()` from the Tauri app API → `matched` / `mismatch` / `unavailable` badge.
 4. Runtime panel renders the cached `runtimeCheckResult` — on a fresh machine: badge `Not met`, message "uv is not installed.", **Resolve** button (`HomeView.vue:199-205`).
 5. The first-run hint (`HomeView.vue:230-232`):

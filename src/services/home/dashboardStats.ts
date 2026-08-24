@@ -8,6 +8,8 @@ import type { TaskRun } from '../../models/TaskRun'
  */
 export interface DashboardStats {
   totalScripts: number
+  usedScripts: number
+  unusedScripts: number
   totalTasks: number
   enabledTasks: number
   totalRuns: number
@@ -23,12 +25,16 @@ export function computeDashboardStats(
   tasks: Task[],
   runs: TaskRun[],
 ): DashboardStats {
+  const usedScriptIds = new Set(tasks.map(task => task.scriptId))
+  const usedScripts = scripts.filter(s => usedScriptIds.has(s.id)).length
   const successRuns = runs.filter(run => run.status === 'success').length
   const failedRuns = runs.filter(run => run.status === 'failed').length
   const totalRuns = successRuns + failedRuns
   const successRate = totalRuns > 0 ? Math.round((successRuns / totalRuns) * 100) : 0
   return {
     totalScripts: scripts.length,
+    usedScripts,
+    unusedScripts: scripts.length - usedScripts,
     totalTasks: tasks.length,
     enabledTasks: tasks.filter(task => task.enabled).length,
     totalRuns,

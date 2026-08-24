@@ -220,16 +220,16 @@ describe('ScriptsListView', () => {
     const secondRowCells = Array.from(rows[1].querySelectorAll('td')).map(td => td.textContent)
     expect(firstRowCells).toContain('x.py')
     expect(firstRowCells[1]).toContain('C:/a/x.py')
-    // First 3 cells should be: name, path, type - the 4th is created date which varies
+    // First 3 cells should be: name, path, status - the 4th is created date which varies
     expect(firstRowCells[0]).toBe('x.py')
     expect(firstRowCells[1]).toContain('C:/a/x.py')
-    expect(firstRowCells[2]).toBe('python')
+    expect(firstRowCells[2]).toBe('Unused')
     expect(firstRowCells[3]).toBeTruthy()
     expect(secondRowCells).toContain('y.py')
     expect(secondRowCells[1]).toContain('C:/a/y.py')
     expect(secondRowCells[0]).toBe('y.py')
     expect(secondRowCells[1]).toContain('C:/a/y.py')
-    expect(secondRowCells[2]).toBe('python')
+    expect(secondRowCells[2]).toBe('Unused')
     expect(secondRowCells[3]).toBeTruthy()
 
     app.unmount()
@@ -286,7 +286,7 @@ describe('ScriptsListView', () => {
     const row = rows[0]
     expect(row.textContent).toContain('backup.py')
     expect(row.textContent).toContain('C:/scripts/backup.py')
-    expect(row.textContent).toContain('python')
+    expect(row.textContent).toContain('Unused')
     expect(row.querySelector('td[title="2024-01-01T00:00:00.000Z"]')?.textContent).toBeTruthy()
 
     app.unmount()

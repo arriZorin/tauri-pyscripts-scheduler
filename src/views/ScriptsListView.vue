@@ -23,7 +23,7 @@
           <tr>
             <th>Name</th>
             <th>Path</th>
-            <th>Type</th>
+            <th>Status</th>
             <th>Created</th>
             <th>Actions</th>
           </tr>
@@ -35,7 +35,9 @@
               {{ s.path }}
               <span v-if="missingScriptIds.includes(s.id)" class="badge badge-warning ml-2" :data-testid="`missing-script-${s.id}`">Missing</span>
             </td>
-            <td><span class="badge badge-info">{{ s.type }}</span></td>
+            <td>
+              <span class="badge" :class="usedScriptIds.has(s.id) ? 'badge-success' : 'badge-ghost'" :data-testid="`script-status-${s.id}`">{{ usedScriptIds.has(s.id) ? 'Used' : 'Unused' }}</span>
+            </td>
             <td :title="s.createdAt"><RelativeTime :date="s.createdAt" /></td>
             <td>
               <div class="join">
@@ -191,9 +193,18 @@ const { scripts, error, busy, addScriptFile, addScriptFolder, load } = useScript
 const sortedScripts = computed(() => sortScripts(scripts.value));
 const missingScriptIds = ref<string[]>([]);
 
+const usedScriptIds = ref<Set<string>>(new Set());
+
 async function loadAndReconcile() {
   await load();
   missingScriptIds.value = await findMissingScriptIds(scripts.value, scriptPathChecker.exists);
+  // Load tasks to determine used/unused status per script
+  try {
+    const tasks = await taskRepository.list();
+    usedScriptIds.value = new Set(tasks.map(t => t.scriptId));
+  } catch {
+    usedScriptIds.value = new Set();
+  }
 }
 
 const operationSummary = ref('');

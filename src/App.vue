@@ -84,8 +84,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="app-container flex min-h-screen w-full">
-    <nav class="sidebar w-52 border-r border-gray-300 bg-gray-100 flex-shrink-0 dark:bg-[#2f2f2f] dark:border-[#404040]">
+  <div class="app-container flex h-screen w-full">
+    <nav class="sidebar w-52 border-r border-gray-300 bg-gray-100 flex-shrink-0 sticky top-0 self-start h-screen dark:bg-[#2f2f2f] dark:border-[#404040]">
       <ul class="menu menu-vertical space-y-1">
         <li
           v-for="item in navItems"

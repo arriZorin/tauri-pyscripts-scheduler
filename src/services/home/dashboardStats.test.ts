@@ -36,6 +36,16 @@ describe('computeDashboardStats', () => {
     expect(stats.enabledTasks).toBe(2)
   })
 
+  it('counts used and unused scripts', () => {
+    const stats = computeDashboardStats(
+      [script({ id: 's1' }), script({ id: 's2' }), script({ id: 's3' })],
+      [task({ scriptId: 's1' }), task({ id: 't2', scriptId: 's2' })],
+      [],
+    )
+    expect(stats.usedScripts).toBe(2)
+    expect(stats.unusedScripts).toBe(1)
+  })
+
   it('computes success rate from runs', () => {
     const stats = computeDashboardStats(
       [script()],

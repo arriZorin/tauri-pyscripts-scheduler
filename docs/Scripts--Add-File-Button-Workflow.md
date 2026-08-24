@@ -1,7 +1,7 @@
 # Add-File-Button Workflow
 
 **Project:** `tauri-pyscripts-scheduler`  
-**Date:** 2026-08-22  
+**Date:** 2026-08-24  
 **Status:** ✅ Complete (frontend + backend)
 
 ---
@@ -29,6 +29,9 @@ The entire "Add File" path is implemented on the frontend. Persistence re-uses t
 src/
 ├── views/
 │   └── ScriptsListView.vue              ← Step 1: button + handleAddFile + confirmDeps
+│                                          Also includes: Status column (Used/Unused) replacing
+│                                          the old Type column; usedScriptIds ref populated
+│                                          during loadAndReconcile from taskRepository.list()
 ├── services/
 │   ├── script/
 │   │   ├── import/

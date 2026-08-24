@@ -27,6 +27,8 @@ const {
 
 const stats = ref<DashboardStats>({
   totalScripts: 0,
+  usedScripts: 0,
+  unusedScripts: 0,
   totalTasks: 0,
   enabledTasks: 0,
   totalRuns: 0,
@@ -133,7 +135,7 @@ onMounted(() => {
               </div>
               <div class="stat-title">Total Scripts</div>
               <div class="stat-value text-primary">{{ stats.totalScripts }}</div>
-              <div class="stat-desc">Python scripts in the library</div>
+              <div class="stat-desc">{{ stats.usedScripts }} used · {{ stats.unusedScripts }} unused</div>
             </button>
 
             <button type="button" class="stat cursor-pointer border-0 bg-transparent text-left transition hover:bg-base-200 focus-visible:outline-2 focus-visible:outline-offset-2" data-testid="stat-tasks" aria-label="Open Task" @click="onNavigate?.('task')">
