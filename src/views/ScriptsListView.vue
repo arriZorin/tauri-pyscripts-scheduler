@@ -1,12 +1,28 @@
 <template>
   <div class="view-container w-full">
-    <header class="region header card p-4 m-2 rounded border border-gray-300 bg-gray-100 mb-4 dark:bg-[#2f2f2f] dark:border-[#404040] flex items-center justify-between">
-      <div class="card-body">
-        <h1 class="text-xl font-semibold">Scripts List</h1>
-        <p class="text-gray-600">Manage your Python scripts</p>
+    <header class="region header card card-compact bg-base-100 border border-base-200 rounded-box shadow-sm p-0 mb-4">
+  <div class="card-body p-4 m-0">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-5 h-5 stroke-current">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold">Scripts</h1>
+          <p class="text-sm text-base-content/60">Python scripts in the library</p>
+        </div>
       </div>
-      <button @click="handleRefresh" class="btn btn-ghost px-3 py-2 rounded bg-gray-600 text-white hover:bg-gray-500" data-testid="refresh-btn">Refresh</button>
-    </header>
+      <button @click="handleRefresh" class="btn btn-primary btn-sm" data-testid="refresh-btn">Refresh</button>
+    </div>
+    <div class="mt-3 pt-3 border-t border-base-200 flex flex-wrap gap-x-4 gap-y-1 text-xs text-base-content/60">
+      <span>{{ scripts.length }} script{{ scripts.length === 1 ? '' : 's' }}</span>
+      <span>{{ usedScriptIds.size }} used · {{ scripts.length - usedScriptIds.size }} unused</span>
+      <span v-if="missingScriptIds.length > 0" class="text-warning">{{ missingScriptIds.length }} missing</span>
+    </div>
+  </div>
+</header>
     <main class="region body card p-4 m-2 rounded border border-gray-300 bg-white min-h-[200px] dark:bg-[#333333] dark:border-[#404040]">
       <div class="flex gap-2 mb-4">
         <button @click="handleAddFile" class="btn btn-primary px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-500 btn-script-action" data-testid="add-file-btn">Add File</button>

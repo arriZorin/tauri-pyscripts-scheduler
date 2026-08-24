@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
+import type { RequirementCheckResult } from '../runtimeCheck/types'
 
 export interface HostHealthItem {
   label: string
@@ -12,7 +13,7 @@ export interface HostHealthResult {
 }
 
 export interface HostHealthService {
-  check(): Promise<HostHealthResult>
+  check(runtimeResult?: RequirementCheckResult | null): Promise<HostHealthResult>
 }
 
 /**
@@ -25,8 +26,9 @@ export interface HostHealthService {
  *   and deletes it.
  * - **Disk free space** — queries free bytes on the system drive.
  *   Warning if < 500 MB, failing if < 100 MB.
+ * - **Python runtime** — reads the cached startup check result.
  */
-export async function checkHostHealth(): Promise<HostHealthResult> {
+export async function checkHostHealth(runtimeResult?: RequirementCheckResult | null): Promise<HostHealthResult> {
   const items: HostHealthItem[] = []
 
   // 1. Task Scheduler
@@ -40,6 +42,9 @@ export async function checkHostHealth(): Promise<HostHealthResult> {
 
   // 4. Disk free space
   await checkDiskFreeSpace(items)
+
+  // 5. Python runtime
+  checkPythonRuntime(items, runtimeResult)
 
   const failing = items.filter(i => !i.ok).length
   const warnings = items.filter(i => i.ok && i.detail.includes('Warning')).length
@@ -154,6 +159,41 @@ async function checkDiskFreeSpace(items: HostHealthItem[]): Promise<void> {
       ok: true,
       detail: 'Could not query',
     })
+  }
+}
+
+function checkPythonRuntime(items: HostHealthItem[], result: RequirementCheckResult | null | undefined): void {
+  if (!result) {
+    items.push({
+      label: 'Python Runtime',
+      ok: true,
+      detail: 'Checking...',
+    })
+    return
+  }
+  switch (result.status) {
+    case 'met':
+      items.push({
+        label: 'Python Runtime',
+        ok: true,
+        detail: result.message,
+      })
+      break
+    case 'notMet':
+    case 'deferred':
+      items.push({
+        label: 'Python Runtime',
+        ok: true,
+        detail: `Warning: ${result.message}`,
+      })
+      break
+    case 'failed':
+      items.push({
+        label: 'Python Runtime',
+        ok: false,
+        detail: result.message,
+      })
+      break
   }
 }
 

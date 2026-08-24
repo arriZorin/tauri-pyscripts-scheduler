@@ -32,10 +32,10 @@ describe('App', () => {
     await nextTick();
     
     // Home should be shown by default
-    expect(container.innerHTML).toContain('Welcome to the application');
-    expect(container.innerHTML).not.toContain('Manage your Python scripts');
-    expect(container.innerHTML).not.toContain('Task management');
-    expect(container.innerHTML).not.toContain('Application settings');
+    expect(container.innerHTML).toContain('Dashboard');
+    expect(container.innerHTML).not.toContain('Python scripts in the library');
+    expect(container.innerHTML).not.toContain('Automate script execution');
+    expect(container.innerHTML).not.toContain('Application configuration');
     
     // Verify we have the right structure
     expect(container.innerHTML).toContain('Home');
@@ -54,8 +54,8 @@ describe('App', () => {
     await nextTick();
     
     // Initially Home should be shown
-    expect(container.innerHTML).toContain('Welcome to the application');
-    expect(container.innerHTML).not.toContain('Manage your Python scripts');
+    expect(container.innerHTML).toContain('Dashboard');
+    expect(container.innerHTML).not.toContain('Python scripts in the library');
     
     // Find the button with text "Scripts List" and click it
     const allButtons = container.querySelectorAll('button');
@@ -69,8 +69,8 @@ describe('App', () => {
     }
     
     // Now ScriptsList content should be shown
-    expect(container.innerHTML).toContain('Manage your Python scripts');
-    expect(container.innerHTML).not.toContain('Welcome to the application');
+    expect(container.innerHTML).toContain('Python scripts in the library');
+    expect(container.innerHTML).not.toContain('Dashboard');
     
     app.unmount();
     document.body.removeChild(container);
@@ -86,7 +86,7 @@ describe('App', () => {
     await nextTick();
     
     // Initially Home should be shown
-    expect(container.innerHTML).toContain('Welcome to the application');
+    expect(container.innerHTML).toContain('Dashboard');
     
     // Find the button with text "Task" and click it
     const allButtons = container.querySelectorAll('button');
@@ -100,8 +100,8 @@ describe('App', () => {
     }
     
     // Now Task content should be shown
-    expect(container.innerHTML).toContain('Task management');
-    expect(container.innerHTML).not.toContain('Welcome to the application');
+    expect(container.innerHTML).toContain('Automate script execution');
+    expect(container.innerHTML).not.toContain('Dashboard');
     
     app.unmount();
     document.body.removeChild(container);
@@ -117,7 +117,7 @@ describe('App', () => {
     await nextTick();
     
     // Initially Home should be shown
-    expect(container.innerHTML).toContain('Welcome to the application');
+    expect(container.innerHTML).toContain('Dashboard');
     
     // Find the button with text "Setting" and click it
     const allButtons = container.querySelectorAll('button');
@@ -131,8 +131,8 @@ describe('App', () => {
     }
     
     // Now Setting content should be shown
-    expect(container.innerHTML).toContain('Application settings');
-    expect(container.innerHTML).not.toContain('Welcome to the application');
+    expect(container.innerHTML).toContain('Application configuration');
+    expect(container.innerHTML).not.toContain('Dashboard');
     
     app.unmount();
     document.body.removeChild(container);
@@ -148,7 +148,7 @@ describe('App', () => {
     await nextTick();
     
     // Initially Home should be shown
-    expect(container.innerHTML).toContain('Welcome to the application');
+    expect(container.innerHTML).toContain('Dashboard');
     
     // Find the button with text "Logging" and click it
     const allButtons = container.querySelectorAll('button');
@@ -162,17 +162,17 @@ describe('App', () => {
     }
     
     // Now Logging content should be shown
-    expect(container.innerHTML).toContain('Application logs');
-    expect(container.innerHTML).not.toContain('Welcome to the application');
+    expect(container.innerHTML).toContain('Run history');
+    expect(container.innerHTML).not.toContain('Dashboard');
     
     app.unmount();
     document.body.removeChild(container);
   });
 
   it.each([
-    ['stat-scripts', 'Manage your Python scripts'],
-    ['stat-tasks', 'Task management'],
-    ['stat-runs', 'Application logs'],
+    ['stat-scripts', 'Python scripts in the library'],
+    ['stat-tasks', 'Automate script execution'],
+    ['stat-runs', 'Run history'],
   ])('clicking %s navigates to its corresponding page', async (statTestId, pageMarker) => {
     const container = document.createElement('div');
     document.body.appendChild(container);
@@ -301,12 +301,10 @@ describe('App', () => {
     app.mount(container);
     await nextTick();
     
-    // Check for navigation buttons with exact labels
     const buttons = container.querySelectorAll('nav button');
     
     expect(buttons.length).toBe(5);
     
-    // Each button should contain exactly one svg element
     const svgCounts = Array.from(buttons).map(btn => btn.querySelectorAll('svg').length);
     expect(svgCounts.every(count => count === 1)).toBe(true);
     

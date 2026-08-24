@@ -58,7 +58,17 @@ const emptyOverrides = {
   scriptRepository: { list: async () => [] } as never,
   taskRepository: { list: async () => [] } as never,
   taskRunRepository: { list: async () => [] } as never,
-  hostHealth: { check: async (): Promise<HostHealthResult> => ({ items: [], status: 'ok' }) } as never,
+  hostHealth: { check: async (runtimeResult?: RequirementCheckResult | null): Promise<HostHealthResult> => {
+    const items: { label: string; ok: boolean; detail: string }[] = []
+    if (runtimeResult) {
+      items.push({
+        label: 'Python Runtime',
+        ok: runtimeResult.status === 'met' || runtimeResult.status === 'notMet' || runtimeResult.status === 'deferred',
+        detail: runtimeResult.status === 'met' ? runtimeResult.message : `Warning: ${runtimeResult.message}`,
+      })
+    }
+    return { items, status: 'ok' }
+  } } as never,
 }
 
 async function mountHome(overrides: Record<string, unknown>, extraProps: Record<string, unknown> = {}) {
@@ -125,29 +135,30 @@ describe('HomeView recent executions', () => {
 })
 
 describe('HomeView runtime requirement card', () => {
-  it('shows a Met badge and no Resolve button when the requirement is met', async () => {
+  it('shows Python runtime line in host health with no Resolve button when met', async () => {
     const { container, app } = await mountHome({
       ...emptyOverrides,
       runtimeCheckResult: ref(runtimeResult('met')),
     })
 
-    const status = container.querySelector('[data-testid="runtime-status"]')
-    expect(status?.textContent).toBe('Met')
-    expect(container.querySelector('[data-testid="runtime-requirement"]')?.textContent).toContain('Python 3.12.10 found on host.')
+    const healthItem = container.querySelector('[data-testid="health-python-runtime"]')
+    expect(healthItem).toBeTruthy()
+    expect(healthItem?.textContent).toContain('Python 3.12.10 found on host.')
     expect(container.querySelector('[data-testid="resolve-runtime"]')).toBeNull()
 
     app.unmount()
     document.body.removeChild(container)
   })
 
-  it('shows a Not met badge with a Resolve button when missing', async () => {
+  it('shows a Resolve button when Python runtime is not met', async () => {
     const { container, app } = await mountHome({
       ...emptyOverrides,
       runtimeCheckResult: ref(runtimeResult('notMet')),
     })
 
-    const status = container.querySelector('[data-testid="runtime-status"]')
-    expect(status?.textContent).toBe('Not met')
+    const healthItem = container.querySelector('[data-testid="health-python-runtime"]')
+    expect(healthItem).toBeTruthy()
+    expect(healthItem?.textContent).toContain('Warning')
     expect(container.querySelector('[data-testid="resolve-runtime"]')).not.toBeNull()
 
     app.unmount()
@@ -169,7 +180,6 @@ describe('HomeView runtime requirement card', () => {
       await Promise.resolve()
     }
 
-    expect(container.querySelector('[data-testid="runtime-status"]')?.textContent).toBe('Met')
     expect(container.querySelector('[data-testid="resolve-runtime"]')).toBeNull()
 
     app.unmount()

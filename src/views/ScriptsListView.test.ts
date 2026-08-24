@@ -133,8 +133,8 @@ describe('ScriptsListView', () => {
     const { container, app } = mountView(new FakeScriptRepository(), new FakeScriptPicker(), new FakeFileScanner())
     await nextTick()
 
-    expect(container.querySelector('.region.header h1')?.textContent?.trim()).toBe('Scripts List')
-    expect(container.querySelector('.region.header p')?.textContent?.trim()).toBe('Manage your Python scripts')
+    expect(container.querySelector('.region.header h1')?.textContent?.trim()).toBe('Scripts')
+    expect(container.querySelector('.region.header p')?.textContent?.trim()).toBe('Python scripts in the library')
     expect(container.querySelector('.region.footer')?.textContent?.trim()).toBe('© 2026 Scripts Management')
     expect(buttonTexts(container).sort()).toEqual(['Add File', 'Add Folder', 'Refresh'])
 

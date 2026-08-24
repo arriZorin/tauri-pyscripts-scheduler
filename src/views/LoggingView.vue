@@ -40,19 +40,31 @@ onMounted(load)
 
 <template>
   <div class="view-container w-full">
-    <header class="region header card p-4 m-2 rounded border border-gray-300 bg-gray-100 mb-4 dark:bg-[#2f2f2f] dark:border-[#404040]">
-      <div class="card-body flex-row items-center justify-between">
-        <div>
-          <h1 class="text-xl font-semibold">Logging</h1>
-          <p class="text-gray-600">Application logs — dev/prod activity record</p>
-          <p v-if="stats" class="text-sm text-gray-500" data-testid="log-stats">{{ stats.count }} entries · since {{ stats.createdDate }}</p>
+    <header class="region header card card-compact bg-base-100 border border-base-200 rounded-box shadow-sm p-0 mb-4">
+  <div class="card-body p-4 m-0">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-5 h-5 stroke-current">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
         </div>
-        <div class="flex gap-2">
-          <button class="btn btn-error" data-testid="log-clear-btn" @click="clearTarget = true">Clear</button>
-          <button class="btn btn-primary" data-testid="log-refresh-btn" @click="load">Refresh</button>
+        <div>
+          <h1 class="text-lg font-bold">Activity Log</h1>
+          <p class="text-sm text-base-content/60">Run history and application events</p>
         </div>
       </div>
-    </header>
+      <div class="flex gap-2">
+        <button class="btn btn-error btn-sm" data-testid="log-clear-btn" @click="clearTarget = true">Clear</button>
+        <button class="btn btn-primary btn-sm" data-testid="log-refresh-btn" @click="load">Refresh</button>
+      </div>
+    </div>
+    <div class="mt-3 pt-3 border-t border-base-200 flex flex-wrap gap-x-4 gap-y-1 text-xs text-base-content/60">
+      <span v-if="stats" data-testid="log-stats">{{ stats.count }} entries · since {{ stats.createdDate }}</span>
+      <span v-else>Loading...</span>
+    </div>
+  </div>
+</header>
     <main class="region body card p-4 m-2 rounded border border-gray-300 bg-white min-h-[200px] dark:bg-[#333333] dark:border-[#404040]">
       <div v-if="feedback" class="alert alert-success mb-3" data-testid="log-feedback" role="alert"><AlertIcon kind="success" /><span>{{ feedback }}</span></div>
       <div v-if="logs.length === 0" class="alert alert-info" data-testid="log-empty-state" role="alert"><AlertIcon kind="info" /><span>No logs yet.</span></div>

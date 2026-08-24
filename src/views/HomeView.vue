@@ -58,7 +58,7 @@ async function loadStats() {
     scriptRepository.list().catch(() => [] as Script[]),
     taskRepository.list().catch(() => [] as Task[]),
     taskRunRepository.list().catch(() => [] as TaskRun[]),
-    hostHealth.check().catch(() => null),
+    hostHealth.check(runtimeResult.value).catch(() => null),
   ]);
   tasks.value = loadedTasks;
   recentRuns.value = [...runs]
@@ -123,13 +123,27 @@ onMounted(() => {
 
 <template>
   <div class="view-container w-full">
-    <header class="region card header p-4 m-2 rounded border border-gray-300 bg-gray-100 mb-4 dark:bg-[#2f2f2f] dark:border-[#404040]">
-      <slot name="header">
-        <div class="card-body">
-          <h1 class="text-xl font-semibold">Home</h1>
-          <p class="text-gray-600">Welcome to the application</p>
+    <header class="region header card card-compact bg-base-100 border border-base-200 rounded-box shadow-sm p-0 mb-4">
+      <div class="card-body p-4 m-0">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-5 h-5 stroke-current">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+            </div>
+            <div>
+              <h1 class="text-lg font-bold">Dashboard</h1>
+              <p class="text-sm text-base-content/60">Overview of scripts, tasks, and system health</p>
+            </div>
+          </div>
         </div>
-      </slot>
+        <div class="mt-3 pt-3 border-t border-base-200 flex flex-wrap gap-x-4 gap-y-1 text-xs text-base-content/60">
+          <span>Python runtime: <span class="font-medium" :class="runtimeResult?.status === 'met' ? 'text-success' : 'text-warning'">{{ runtimeStatusLabel(runtimeResult?.status ?? 'failed') }}</span></span>
+          <span>Host: <span class="font-medium" :class="hostHealthResult?.status === 'ok' ? 'text-success' : hostHealthResult?.status === 'warning' ? 'text-warning' : 'text-error'">{{ hostHealthResult ? (hostHealthResult.status === 'ok' ? 'All ok' : hostHealthResult.status === 'warning' ? 'Warnings' : 'Failing') : 'Checking...' }}</span></span>
+          <span v-if="stats.nextRunName">Next: <span class="font-medium">{{ stats.nextRunName }}</span> {{ formatRunDate(stats.nextRunAt) }}</span>
+        </div>
+      </div>
     </header>
     <main class="region card body p-4 m-2 rounded border border-gray-300 bg-white min-h-[200px] dark:bg-[#333333] dark:border-[#404040]">
       <slot name="body">
@@ -165,8 +179,8 @@ onMounted(() => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <div class="stat-value">{{ stats.totalRuns > 0 ? `${stats.successRate}%` : '—' }}</div>
               <div class="stat-title">Success rate</div>
+              <div class="stat-value">{{ stats.totalRuns > 0 ? `${stats.successRate}%` : '—' }}</div>
               <div class="stat-desc">{{ stats.successRuns }} of {{ stats.totalRuns }} runs succeeded</div>
               <div v-if="stats.lastRunName" class="stat-desc text-xs opacity-60">Last: {{ stats.lastRunName }} ({{ stats.lastRunStatus }})</div>
             </button>
@@ -217,25 +231,12 @@ onMounted(() => {
                   <span class="opacity-70">{{ item.detail }}</span>
                 </div>
               </div>
-              <div class="divider my-2"></div>
-              <div data-testid="runtime-requirement">
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <div class="text-xs uppercase opacity-60">Python runtime</div>
-                    <div class="font-medium">{{ runtimeResult?.message ?? 'Checking...' }}</div>
-                    <div v-if="runtimeResult?.detail" class="text-xs opacity-60">{{ runtimeResult.detail }}</div>
-                    <div v-if="runtimeResult?.status === 'met' && runtimeResult.resolvedPath" class="text-xs opacity-60">{{ runtimeResult.resolvedPath }}</div>
-                  </div>
-                  <span v-if="runtimeResult" class="badge" :class="runtimeStatusBadge(runtimeResult.status)" data-testid="runtime-status">{{ runtimeStatusLabel(runtimeResult.status) }}</span>
-                  <span v-else class="loading loading-spinner loading-sm" aria-label="Checking runtime"></span>
-                </div>
-                <div v-if="runtimeResult && runtimeResult.status !== 'met'" class="card-actions justify-end">
-                  <button type="button" class="btn btn-primary btn-sm" data-testid="resolve-runtime"
-                          :disabled="runtimeResolving" @click="resolveRuntime">
-                    <span v-if="runtimeResolving" class="loading loading-spinner loading-xs"></span>
-                    {{ runtimeResult.status === 'deferred' ? 'Try again' : 'Resolve' }}
-                  </button>
-                </div>
+              <div v-if="runtimeResult && runtimeResult.status !== 'met'" class="card-actions justify-end mt-2">
+                <button type="button" class="btn btn-primary btn-sm" data-testid="resolve-runtime"
+                        :disabled="runtimeResolving" @click="resolveRuntime">
+                  <span v-if="runtimeResolving" class="loading loading-spinner loading-xs"></span>
+                  {{ runtimeResult.status === 'deferred' ? 'Try again' : 'Resolve' }}
+                </button>
               </div>
             </div>
           </section>

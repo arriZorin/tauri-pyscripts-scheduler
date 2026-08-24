@@ -55,7 +55,7 @@ describe('LoggingView', () => {
     await flush()
 
     expect(container.querySelector('[data-testid="log-empty-state"]')?.textContent).toContain('No logs')
-    expect(container.querySelector('.region.header')?.textContent).toContain('Logging')
+    expect(container.querySelector('.region.header')?.textContent).toContain('Activity Log')
     app.unmount()
   })
 

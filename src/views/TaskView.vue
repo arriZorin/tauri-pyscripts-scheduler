@@ -44,6 +44,19 @@ const repairingTaskId = ref<string | null>(null)
 const cleaningOrphans = ref(false)
 const removeBrokenConfirm = ref(false)
 
+const enabledTasks = computed(() => tasks.value.filter(t => t.enabled))
+const nextScheduledTask = computed(() => {
+  const withNext = enabledTasks.value.filter(t => t.nextRunAt).sort((a, b) => Date.parse(a.nextRunAt!) - Date.parse(b.nextRunAt!))
+  return withNext[0] ?? null
+})
+const scheduleBreakdown = computed(() => {
+  const counts: Record<string, number> = {}
+  for (const t of tasks.value) {
+    counts[t.schedule.type] = (counts[t.schedule.type] ?? 0) + 1
+  }
+  return Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([type, count]) => `${count} ${type}`).join(' · ')
+})
+
 async function loadScripts() {
   if (!scriptRepository) return
   try {
@@ -454,15 +467,30 @@ onMounted(() => {
 
 <template>
   <div class="view-container w-full">
-    <header class="region header card p-4 m-2 rounded border border-gray-300 bg-gray-100 mb-4 dark:bg-[#2f2f2f] dark:border-[#404040]">
-      <div class="card-body flex-row items-center justify-between">
-        <div>
-          <h1 class="text-xl font-semibold">Task</h1>
-          <p class="text-gray-600">Task management — schedule and manage Python scripts</p>
+    <header class="region header card card-compact bg-base-100 border border-base-200 rounded-box shadow-sm p-0 mb-4">
+  <div class="card-body p-4 m-0">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-5 h-5 stroke-current">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
         </div>
-        <button class="btn btn-primary" data-testid="new-task-btn" @click="openCreate">New Task</button>
+        <div>
+          <h1 class="text-lg font-bold">Scheduled Tasks</h1>
+          <p class="text-sm text-base-content/60">Automate script execution on a schedule</p>
+        </div>
       </div>
-    </header>
+      <button class="btn btn-primary btn-sm" data-testid="new-task-btn" @click="openCreate">New Task</button>
+    </div>
+    <div class="mt-3 pt-3 border-t border-base-200 flex flex-wrap gap-x-4 gap-y-1 text-xs text-base-content/60">
+      <span>{{ tasks.length }} task{{ tasks.length === 1 ? '' : 's' }}</span>
+      <span>{{ enabledTasks.length }} enabled · {{ tasks.length - enabledTasks.length }} disabled</span>
+      <span v-if="scheduleBreakdown">{{ scheduleBreakdown }}</span>
+      <span v-if="nextScheduledTask">Next: <span class="font-medium">{{ nextScheduledTask.name }}</span></span>
+    </div>
+  </div>
+</header>
     <main class="region body card p-4 m-2 rounded border border-gray-300 bg-white min-h-[200px] dark:bg-[#333333] dark:border-[#404040]">
       <div v-if="operationResult" class="alert alert-success mb-3" data-testid="task-operation-result" role="alert"><AlertIcon kind="success" /><span>{{ operationResult }}</span></div>
       <div v-if="operationError" class="alert alert-error mb-3" data-testid="task-operation-error" role="alert"><AlertIcon kind="error" /><span>{{ operationError }}</span></div>
