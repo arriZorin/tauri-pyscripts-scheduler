@@ -45,7 +45,10 @@ export class TauriVenvSync implements VenvSync {
     )
 
     if (remaining.length === 0) {
-      // No scripts left in this folder — delete the venv
+      // No scripts left in this folder — delete the venv.
+      // If the folder itself doesn't exist, the venv is already gone — no-op.
+      const folderExists = await invoke<boolean>('path_exists', { path: workingDir })
+      if (!folderExists) return
       await invoke('delete_script_venv', { dirPath: workingDir })
     } else {
       // Re-sync with remaining scripts' requirements.txt
