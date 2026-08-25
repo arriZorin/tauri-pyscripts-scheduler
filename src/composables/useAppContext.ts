@@ -10,6 +10,8 @@ import type { TaskRunRepository } from '../services/task/TaskRunRepository'
 import { JsonTaskRunRepository } from '../services/task/JsonTaskRunRepository'
 import type { TaskExecutor } from '../services/task/TaskExecutor'
 import { TauriTaskExecutor } from '../services/task/TaskExecutor'
+import type { FolderRevealer } from '../services/task/FolderRevealer'
+import { TauriFolderRevealer } from '../services/task/FolderRevealer'
 import type { TaskScheduler } from '../services/task/TaskScheduler'
 import { TauriTaskScheduler } from '../services/task/TaskScheduler'
 import type { ScriptPicker } from '../services/script/import/ScriptPicker'
@@ -34,6 +36,7 @@ export interface AppContext {
   taskExecutor: TaskExecutor
   taskScheduler: TaskScheduler
   taskRunRecorder: TaskRunRecorder
+  folderRevealer: FolderRevealer
   picker: ScriptPicker
   scanner: FileScanner
   hostHealth: HostHealthService
@@ -64,6 +67,7 @@ export function createAppContext(overrides: Partial<AppContext> = {}): AppContex
     taskExecutor: overrides.taskExecutor ?? new TauriTaskExecutor(),
     taskScheduler: overrides.taskScheduler ?? new TauriTaskScheduler(),
     taskRunRecorder: overrides.taskRunRecorder ?? new TaskRunRecorder(taskRunRepository),
+    folderRevealer: overrides.folderRevealer ?? new TauriFolderRevealer(),
     picker: overrides.picker ?? new TauriScriptPicker(),
     scanner: overrides.scanner ?? new TauriFileScanner(),
     hostHealth: overrides.hostHealth ?? tauriHostHealthService,

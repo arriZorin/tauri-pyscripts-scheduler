@@ -161,6 +161,42 @@ fn path_exists(path: String) -> Result<bool, String> {
     Ok(Path::new(&path).is_file())
 }
 
+/// Builds the `explorer.exe /select,<path>` argument, normalizing forward
+/// slashes to backslashes so Explorer opens the file's folder with the file
+/// selected. Rejects empty and non-absolute paths.
+fn explorer_select_arg(path: &str) -> Result<String, String> {
+    if path.is_empty() {
+        return Err("path cannot be empty".to_string());
+    }
+    if !Path::new(path).is_absolute() && !is_absolute_windows_path(path) {
+        return Err("path must be absolute".to_string());
+    }
+    Ok(format!("/select,{}", path.replace('/', "\\")))
+}
+
+#[tauri::command]
+fn reveal_in_explorer(path: String) -> Result<(), String> {
+    let select_arg = explorer_select_arg(&path)?;
+    if !Path::new(&path).is_file() {
+        return Err("path does not exist".to_string());
+    }
+    #[cfg(windows)]
+    {
+        // explorer.exe is a shell command; spawn (don't block) and let it
+        // return immediately — the Explorer window is the user feedback.
+        std::process::Command::new("explorer.exe")
+            .arg(select_arg)
+            .spawn()
+            .map_err(|e| format!("failed to open explorer: {}", e))?;
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = select_arg;
+        Err("reveal in explorer is only supported on Windows".to_string())
+    }
+}
+
 #[derive(Deserialize)]
 struct SchedulePayload {
     schedule_type: String,
@@ -456,6 +492,7 @@ pub fn run() {
             read_text_file,
             write_text_file,
             path_exists,
+            reveal_in_explorer,
             create_scheduled_task,
             update_scheduled_task,
             delete_scheduled_task,
@@ -631,6 +668,47 @@ mod tests {
         );
         assert_eq!(
             crate::path_exists("scripts/run.py".to_string()).unwrap_err(),
+            "path must be absolute"
+        );
+    }
+
+    #[test]
+    fn test_explorer_select_arg_normalizes_forward_slashes() {
+        assert_eq!(
+            crate::explorer_select_arg("C:/scripts/backup.py").unwrap(),
+            "/select,C:\\scripts\\backup.py"
+        );
+    }
+
+    #[test]
+    fn test_explorer_select_arg_keeps_backslashes() {
+        assert_eq!(
+            crate::explorer_select_arg("C:\\scripts\\backup.py").unwrap(),
+            "/select,C:\\scripts\\backup.py"
+        );
+    }
+
+    #[test]
+    fn test_explorer_select_arg_rejects_empty_and_relative_paths() {
+        assert_eq!(
+            crate::explorer_select_arg("").unwrap_err(),
+            "path cannot be empty"
+        );
+        assert_eq!(
+            crate::explorer_select_arg("scripts/run.py").unwrap_err(),
+            "path must be absolute"
+        );
+        assert_eq!(
+            crate::explorer_select_arg("python").unwrap_err(),
+            "path must be absolute"
+        );
+    }
+
+    #[test]
+    fn test_reveal_in_explorer_rejects_relative_paths() {
+        // Only the validation path is tested — the spawn launches a GUI process.
+        assert_eq!(
+            crate::reveal_in_explorer("scripts/run.py".to_string()).unwrap_err(),
             "path must be absolute"
         );
     }

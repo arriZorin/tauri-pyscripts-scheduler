@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import AlertIcon from '../components/icons/AlertIcon.vue'
+import FolderIcon from '../components/icons/FolderIcon.vue'
+import PencilIcon from '../components/icons/PencilIcon.vue'
+import PlayIcon from '../components/icons/PlayIcon.vue'
+import PowerIcon from '../components/icons/PowerIcon.vue'
+import TrashIcon from '../components/icons/TrashIcon.vue'
+import WrenchIcon from '../components/icons/WrenchIcon.vue'
 import { useAppContext } from '../composables/useAppContext'
 import { useAutoDismiss } from '../composables/useAutoDismiss'
 import { scriptDisplayLabels, sortScripts } from '../services/script/scriptLabels'
@@ -13,7 +19,7 @@ import type { ReconcileResult } from '../services/task/TaskReconciler'
 import { findMissingScriptIds } from '../services/script/scriptReconciliation'
 import { errorMessage } from '../services/shared/errorMessage'
 
-const { scriptRepository, taskRepository, taskExecutor, taskScheduler, logger, taskRunRepository, taskRunRecorder, scriptPathChecker, runtimeCheckResult } = useAppContext()
+const { scriptRepository, taskRepository, taskExecutor, taskScheduler, logger, taskRunRepository, taskRunRecorder, scriptPathChecker, runtimeCheckResult, folderRevealer } = useAppContext()
 const scripts = ref<Script[]>([])
 const sortedScripts = computed(() => sortScripts(scripts.value))
 const selectableScripts = computed(() => sortedScripts.value.filter(script => !missingPathScriptIds.value.includes(script.id)))
@@ -424,6 +430,17 @@ function requestDelete(task: Task) {
   deleteTarget.value = task
 }
 
+async function openFolder(task: Task) {
+  const script = scripts.value.find(s => s.id === task.scriptId)
+  if (!script) return
+  operationError.value = ''
+  try {
+    await folderRevealer.reveal(script.path)
+  } catch (cause) {
+    operationError.value = errorText(cause, 'Failed to open folder.')
+  }
+}
+
 function cancelDelete() {
   deleteTarget.value = null
 }
@@ -516,19 +533,20 @@ onMounted(() => {
             <td><span v-if="hasMissingScript(task.scriptId)" class="badge badge-error" data-testid="script-missing-badge">script_missing</span><span v-else-if="isTaskMissing(task.id)" class="badge badge-warning" data-testid="scheduler-missing-badge">unregistered</span><span v-else class="badge" :class="task.enabled ? 'badge-success' : 'badge-ghost'">{{ task.enabled ? 'Enabled' : 'Disabled' }}</span></td>
             <td><div class="join">
               <template v-if="hasMissingScript(task.scriptId)">
-                <button class="btn btn-xs join-item" :data-testid="`edit-task-${task.id}`" @click="openEdit(task)">Edit</button>
-                <button v-if="!isTaskMissing(task.id) && task.enabled" class="btn btn-xs join-item" :data-testid="`disable-task-${task.id}`" @click="toggle(task)">Disable</button>
-                <button class="btn btn-xs btn-error join-item" :data-testid="`delete-task-${task.id}`" @click="requestDelete(task)">Delete</button>
+                <button class="btn btn-xs btn-ghost join-item" :data-testid="`edit-task-${task.id}`" :title="`Edit ${task.name}`" @click="openEdit(task)"><PencilIcon /></button>
+                <button v-if="!isTaskMissing(task.id) && task.enabled" class="btn btn-xs btn-ghost join-item" :data-testid="`disable-task-${task.id}`" :title="`Disable ${task.name}`" @click="toggle(task)"><PowerIcon /></button>
+                <button class="btn btn-xs btn-ghost join-item text-error" :data-testid="`delete-task-${task.id}`" :title="`Delete ${task.name}`" @click="requestDelete(task)"><TrashIcon /></button>
               </template>
               <template v-else-if="isTaskMissing(task.id)">
-                <button class="btn btn-xs btn-warning join-item" :data-testid="`repair-task-${task.id}`" :disabled="repairingTaskId === task.id || repairing" @click="repairTaskRow(task)">{{ repairingTaskId === task.id ? 'Repairing...' : 'Repair' }}</button>
-                <button class="btn btn-xs btn-error join-item" :data-testid="`delete-task-${task.id}`" @click="requestDelete(task)">Delete</button>
+                <button class="btn btn-xs btn-ghost join-item text-warning" :data-testid="`repair-task-${task.id}`" :title="`Repair ${task.name}`" :disabled="repairingTaskId === task.id || repairing" @click="repairTaskRow(task)"><WrenchIcon /></button>
+                <button class="btn btn-xs btn-ghost join-item text-error" :data-testid="`delete-task-${task.id}`" :title="`Delete ${task.name}`" @click="requestDelete(task)"><TrashIcon /></button>
               </template>
               <template v-else>
-                <button class="btn btn-xs join-item" :data-testid="`edit-task-${task.id}`" @click="openEdit(task)">Edit</button>
-                <button class="btn btn-xs join-item" :data-testid="`toggle-task-${task.id}`" @click="toggle(task)">{{ task.enabled ? 'Disable' : 'Enable' }}</button>
-                <button class="btn btn-xs btn-primary join-item" :data-testid="`run-task-${task.id}`" :disabled="runningTaskId === task.id || !task.enabled" @click="runTask(task)">{{ runningTaskId === task.id ? 'Starting...' : 'Run Now' }}</button>
-                <button class="btn btn-xs btn-error join-item" :data-testid="`delete-task-${task.id}`" @click="requestDelete(task)">Delete</button>
+                <button class="btn btn-xs btn-ghost join-item" :data-testid="`edit-task-${task.id}`" :title="`Edit ${task.name}`" @click="openEdit(task)"><PencilIcon /></button>
+                <button class="btn btn-xs btn-ghost join-item" :data-testid="`toggle-task-${task.id}`" :title="task.enabled ? `Disable ${task.name}` : `Enable ${task.name}`" @click="toggle(task)"><PowerIcon /></button>
+                <button class="btn btn-xs btn-ghost join-item text-primary" :data-testid="`run-task-${task.id}`" :title="`Run ${task.name}`" :disabled="runningTaskId === task.id || !task.enabled" @click="runTask(task)"><span v-if="runningTaskId === task.id" class="loading loading-spinner loading-xs"></span><PlayIcon v-else /></button>
+                <button class="btn btn-xs btn-ghost join-item text-primary" :data-testid="`open-folder-task-${task.id}`" :title="`Open folder: ${scriptLabelOf(task.scriptId)}`" @click="openFolder(task)"><FolderIcon /></button>
+                <button class="btn btn-xs btn-ghost join-item text-error" :data-testid="`delete-task-${task.id}`" :title="`Delete ${task.name}`" @click="requestDelete(task)"><TrashIcon /></button>
               </template>
             </div></td>
           </tr>

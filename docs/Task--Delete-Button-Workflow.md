@@ -107,14 +107,14 @@ Tests supply fakes at the same boundary (`FakeTaskRepository` /
 
 ### Step 1 — Vue UI Layer
 
-**Location:** `src/views/TaskView.vue` (buttons at :493/:497/:503, `requestDelete` at :410, modal at :602, `confirmDelete` at :418)
+**Location:** `src/views/TaskView.vue` (buttons at :538/:542/:549, `requestDelete` at :429, modal at :648, `confirmDelete` at :448)
 
 The Delete button appears in all three row templates — script-missing
 (registered), script-missing (unregistered), and normal rows. Identical in
-each, e.g. the normal row (`:503`):
+each, e.g. the normal row (`:549`):
 
 ```vue
-<button class="btn btn-xs btn-error join-item" :data-testid="`delete-task-${task.id}`" @click="requestDelete(task)">Delete</button>
+<button class="btn btn-xs btn-ghost join-item text-error" :data-testid="`delete-task-${task.id}`" :title="`Delete ${task.name}`" @click="requestDelete(task)"><TrashIcon /></button>
 ```
 
 `requestDelete` only stages the target; the destructive work happens after
@@ -320,13 +320,13 @@ Delete click → requestDelete → modal confirm → confirmDelete
 
 | Aspect | Status |
 |--------|--------|
-| Delete button in all three row templates | ✅ Implemented (`TaskView.vue:493`/`:497`/`:503`) |
-| Confirmation modal | ✅ Implemented (`TaskView.vue:602-604`) |
+| Delete button in all three row templates | ✅ Implemented (`TaskView.vue:538`/`:542`/`:549`) |
+| Confirmation modal | ✅ Implemented (`TaskView.vue:648`) |
 | `tasks.json` removal | ✅ Implemented (`JsonTaskRepository.ts:65-69`) |
 | COM registration removal | ✅ Implemented (`TaskScheduler.ts:48-54` → `delete_scheduled_task`) |
 | Delete-of-unregistered = success | ✅ Implemented (swallowed, `TaskScheduler.ts:51-53`) |
-| Failure surface (repository errors) | ✅ Implemented (`operationError` alert, `TaskView.vue:428`/`:468`) |
-| Post-delete reload + reconcile | ✅ Implemented (`TaskView.vue:76-84`) |
+| Failure surface (repository errors) | ✅ Implemented (`operationError` alert, `TaskView.vue:513`) |
+| Post-delete reload + reconcile | ✅ Implemented (`TaskView.vue:95`) |
 | Unit tests | ✅ Implemented (`TaskView.test.ts:412`/`:528`, `TaskScheduler.test.ts:151`, `JsonTaskRepository.test.ts:88`) |
 
 **Conclusion:** The Delete workflow is complete across all four layers — Vue

@@ -6,6 +6,7 @@ import type { Script } from '../models/Script'
 import type { Task, TaskInput } from '../models/Task'
 import type { TaskRun } from '../models/TaskRun'
 import { TaskRunRecorder } from '../services/task/TaskRunRecorder'
+import { TauriFolderRevealer } from '../services/task/FolderRevealer'
 import type { TaskRunRepository } from '../services/task/TaskRunRepository'
 import type { ScriptPathChecker } from '../services/script/scriptPathChecker'
 import type { RequirementCheckResult } from '../services/runtimeCheck/types'
@@ -24,6 +25,16 @@ class FakeTaskExecutor {
     this.calls.push(task.id)
     if (this.error) throw this.error
     return this.result
+  }
+}
+
+class FakeFolderRevealer {
+  reveals: string[] = []
+  error: unknown = null
+
+  async reveal(scriptPath: string) {
+    if (this.error) throw this.error
+    this.reveals.push(scriptPath)
   }
 }
 
@@ -148,7 +159,7 @@ class FakeScriptRepository {
   async list() { return [...this.items] }
 }
 
-function mountView(repository: FakeTaskRepository, executor = new FakeTaskExecutor(), scheduler = new FakeTaskScheduler(), logger = new FakeLogger(), runRepository = new FakeTaskRunRepository(), scriptRepository: FakeScriptRepository | null = null, pathChecker: ScriptPathChecker = { exists: async () => true }, runtimeCheck: RequirementCheckResult | null = null) {
+function mountView(repository: FakeTaskRepository, executor = new FakeTaskExecutor(), scheduler = new FakeTaskScheduler(), logger = new FakeLogger(), runRepository = new FakeTaskRunRepository(), scriptRepository: FakeScriptRepository | null = null, pathChecker: ScriptPathChecker = { exists: async () => true }, runtimeCheck: RequirementCheckResult | null = null, folderRevealer: FakeFolderRevealer | null = null) {
   const container = document.createElement('div')
   document.body.appendChild(container)
   const app = createApp(TaskView)
@@ -162,6 +173,7 @@ function mountView(repository: FakeTaskRepository, executor = new FakeTaskExecut
     scriptRepository: (scriptRepository ?? new FakeScriptRepository()) as never,
     scriptPathChecker: pathChecker,
     runtimeCheckResult: ref(runtimeCheck),
+    folderRevealer: (folderRevealer ?? new TauriFolderRevealer()) as never,
   }))
   app.mount(container)
   return { container, app, runRepository }
@@ -448,6 +460,35 @@ it('runs a task now and shows the executor result', async () => {
 
   expect(executor.calls).toEqual(['task-1'])
   expect(container.querySelector('[data-testid="task-operation-result"]')?.textContent).toContain('Task started')
+  app.unmount()
+})
+
+it('reveals the script folder via the Open Folder button', async () => {
+  const repository = new FakeTaskRepository()
+  await repository.create({ name: 'Reveal me', scriptId: script.id, interpreter: 'python', arguments: [], schedule: { type: 'daily', startAt: '2026-08-14T08:00:00' }, enabled: true })
+  const revealer = new FakeFolderRevealer()
+  const { container, app } = mountView(repository, new FakeTaskExecutor(), new FakeTaskScheduler(), new FakeLogger(), new FakeTaskRunRepository(), null, { exists: async () => true }, null, revealer)
+  await flush()
+
+  ;(container.querySelector('[data-testid="open-folder-task-task-1"]') as HTMLElement).click()
+  await flush()
+
+  expect(revealer.reveals).toEqual(['C:/scripts/backup.py'])
+  app.unmount()
+})
+
+it('shows an error banner when opening the folder fails', async () => {
+  const repository = new FakeTaskRepository()
+  await repository.create({ name: 'Reveal me', scriptId: script.id, interpreter: 'python', arguments: [], schedule: { type: 'daily', startAt: '2026-08-14T08:00:00' }, enabled: true })
+  const revealer = new FakeFolderRevealer()
+  revealer.error = 'boom'
+  const { container, app } = mountView(repository, new FakeTaskExecutor(), new FakeTaskScheduler(), new FakeLogger(), new FakeTaskRunRepository(), null, { exists: async () => true }, null, revealer)
+  await flush()
+
+  ;(container.querySelector('[data-testid="open-folder-task-task-1"]') as HTMLElement).click()
+  await flush()
+
+  expect(container.querySelector('[data-testid="task-operation-error"]')?.textContent).toContain('boom')
   app.unmount()
 })
 

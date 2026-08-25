@@ -333,11 +333,11 @@ Every primary view degrades gracefully on a fresh start:
 |------|-------------|
 | Home | Dashboard zeros + "No scripts or tasks yet." hint (`HomeView.vue:285`) |
 | Scripts List | "No scripts yet. Add a .py file or folder." (`ScriptsListView.vue:153`) |
-| Task | "No tasks yet." (`TaskView.vue:462`) |
-| Task run history | "No runs yet." (`TaskView.vue:505`) |
+| Task | "No tasks yet." (`TaskView.vue:525`) |
+| Task run history | "No runs yet." (`TaskView.vue:569`) |
 | Home recent executions | "No executions yet." (`HomeView.vue:266`) |
 
-Each view's `onMounted` loads its own data (ScriptsListView `loadAndReconcile` at `:424-426`, TaskView `load()` + `loadRuns()` at `:432-435`), all of which resolve to empty lists when the JSON files do not exist yet. First writes (e.g. Add File → `scripts.json`) create the files on demand through `write_text_file` (`lib.rs:127-150`).
+Each view's `onMounted` loads its own data (ScriptsListView `loadAndReconcile` at `:424-426`, TaskView `load()` + `loadRuns()` at `:479-481`), all of which resolve to empty lists when the JSON files do not exist yet. First writes (e.g. Add File → `scripts.json`) create the files on demand through `write_text_file` (`lib.rs:127-150`).
 
 ---
 

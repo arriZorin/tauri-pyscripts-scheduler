@@ -130,7 +130,7 @@ deps, e.g. `FakeTaskRepository` / `FakeTaskRunRepository` in
 
 ### Step 1 — Mount & Kick-off
 
-**Location:** `src/views/TaskView.vue:449-452`
+**Location:** `src/views/TaskView.vue:479-481`
 
 ```ts
 onMounted(() => {
@@ -154,7 +154,7 @@ Page mount → `load()` + `loadRuns()` (parallel)
 
 ### Step 2 — Task/Script Loaders
 
-**Location:** `src/views/TaskView.vue:47-84`
+**Location:** `src/views/TaskView.vue:66-103`
 
 ```ts
 async function loadScripts() {
@@ -195,7 +195,7 @@ async function load() {
 
 ### Step 3 — Reconciliation (JSON vs Windows Task Scheduler)
 
-**Location:** `src/views/TaskView.vue:86-93` → `src/services/task/TaskReconciler.ts:15-27`
+**Location:** `src/views/TaskView.vue:105-112` → `src/services/task/TaskReconciler.ts:15-27`
 
 ```ts
 async function loadReconcile() {
@@ -234,7 +234,7 @@ export function reconcileTasks(tasks: Task[], registeredNames: string[]): Reconc
      badge + Repair action.
    - **orphaned** — registrations under `PyscriptScheduler\` with no matching
      JSON task → Clean Orphans action.
-3. The result drives the reconcile banner (`TaskView.vue:469-479`) with counts
+3. The result drives the reconcile banner (`TaskView.vue:514`) with counts
    and the Repair All / Clean Orphans / Remove Broken buttons. A failure leaves
    an empty `{ missing: [], orphaned: [] }` — no banner, no crash.
 
@@ -242,7 +242,7 @@ export function reconcileTasks(tasks: Task[], registeredNames: string[]): Reconc
 
 ### Step 4 — Run History Loader
 
-**Location:** `src/views/TaskView.vue:177-184` → `src/services/task/TaskRunRecorder.ts:56-100`
+**Location:** `src/views/TaskView.vue:196-203` → `src/services/task/TaskRunRecorder.ts:56-100`
 
 ```ts
 async function loadRuns() {
@@ -296,7 +296,7 @@ private async finalize(run: TaskRun): Promise<void> {
    finalized state on load.
 3. The runs table renders the newest 200 runs (JSON adapter caps at 200,
    `JsonTaskRunRepository.ts:6, 27`), sorted newest-first by `startedAt`
-   (`filteredRuns`, `TaskView.vue:186-191`), filterable All/Success/Failed.
+   (`filteredRuns`, `TaskView.vue:205-210`), filterable All/Success/Failed.
 
 ---
 
@@ -336,8 +336,8 @@ async list(): Promise<TaskRun[]> {
    `invoke('read_text_file')`).
 2. `null` content (JSON file not created yet, `read_text_file` returns
    `Ok(None)` on NotFound) → `[]` — this powers both empty states:
-   "No tasks yet." (`TaskView.vue:480`) and "No runs yet."
-   (`TaskView.vue:523`). There is no dedicated bootstrap path.
+   "No tasks yet." (`TaskView.vue:525`) and "No runs yet."
+   (`TaskView.vue:569`). There is no dedicated bootstrap path.
 3. `tasksFromJson`/`runsFromJson` parse and guard against non-array content;
    the runs adapter additionally swallows parse errors (`[]` fallback).
 
@@ -360,8 +360,8 @@ TaskView (onMounted)
 
 | Aspect                    | Status                                      |
 |---------------------------|---------------------------------------------|
-| Mount kick-off            | ✅ Implemented (`TaskView.vue:449`)         |
-| Task/script loaders       | ✅ Implemented (`TaskView.vue:47-84`)       |
+| Mount kick-off            | ✅ Implemented (`TaskView.vue:479`)         |
+| Task/script loaders       | ✅ Implemented (`TaskView.vue:66-103`)      |
 | Reconciliation diff       | ✅ Implemented (`TaskReconciler.ts:19`)     |
 | Run-history finalize+load | ✅ Implemented (`TaskRunRecorder.ts:56`)    |
 | Persistence (tasks/runs)  | ✅ Implemented (`JsonTaskRepository`/`JsonTaskRunRepository`) |

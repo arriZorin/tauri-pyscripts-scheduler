@@ -48,7 +48,7 @@ src/
 
 | File | Role |
 |------|------|
-| `src/views/TaskView.vue` | Button (line 502) + `runTask()` handler (line 387) |
+| `src/views/TaskView.vue` | Run Now icon button (line 547) + `runTask()` handler (line 406) |
 | `src/services/task/TaskExecutor.ts` | `TauriTaskExecutor.run()` — invokes `run_scheduled_task` |
 | `src/services/task/TaskRunRecorder.ts` | `recordStart()` / `recordFailure()` / `finalizePending()` |
 | `src/services/task/TaskRunRepository.ts` | Port (interface) |
@@ -67,7 +67,7 @@ src-tauri/
 
 **Relevant existing commands (already registered in `invoke_handler`, `src-tauri/src/lib.rs:453`):**
 
-- `run_scheduled_task` — generic COM task trigger used by both Run Now and scheduled execution (`lib.rs:282`)
+- `run_scheduled_task` — generic COM task trigger used by both Run Now and scheduled execution (`lib.rs:318`)
 - `get_scheduled_task_status` — used by `TaskRunRecorder.finalizePending` to check if still running
 - `get_task_run_result` — used by `TaskRunRecorder.finalizePending` to obtain last result + log paths
 - `read_text_file` / `write_text_file` — used by `TauriFileStorage` for `task-runs.json`
@@ -101,14 +101,16 @@ Tests supply fakes at the same boundary (`useAppContext` overrides / direct cons
 
 ### Step 1 — Vue UI Layer
 
-**Location:** `src/views/TaskView.vue` (button at line 502, handler at line 387)
+**Location:** `src/views/TaskView.vue` (button at line 547, handler at line 406)
 
 ```vue
-<button class="btn btn-xs btn-primary join-item"
+<button class="btn btn-xs btn-ghost join-item text-primary"
   :data-testid="`run-task-${task.id}`"
+  :title="`Run ${task.name}`"
   :disabled="runningTaskId === task.id || !task.enabled"
   @click="runTask(task)">
-  {{ runningTaskId === task.id ? 'Starting...' : 'Run Now' }}
+  <span v-if="runningTaskId === task.id" class="loading loading-spinner loading-xs"></span>
+  <PlayIcon v-else />
 </button>
 ```
 
@@ -145,7 +147,7 @@ async function runTask(task: Task) {
 
 **Behaviour:**
 
-1. Set `runningTaskId` → disables the button, shows "Starting..."
+1. Set `runningTaskId` → disables the button, swaps the play icon for a DaisyUI spinner
 2. Clear previous `operationResult` / `operationError`
 3. Call `taskRunRecorder.recordStart(task.id)` — creates a TaskRun with status `'running'`, persists to `task-runs.json`
 4. Call `taskExecutor.run(task)` — invokes `run_scheduled_task` Rust command via COM
@@ -288,7 +290,7 @@ TaskRunRecorder
 
 ### Step 5 — Rust: `run_scheduled_task` (COM)
 
-**Location:** `src-tauri/src/lib.rs:282` (registered in `invoke_handler` at line 463)
+**Location:** `src-tauri/src/lib.rs:318` (registered in `invoke_handler` at line 500)
 
 ```rust
 #[tauri::command]
@@ -360,8 +362,8 @@ async function loadRuns() {
 
 | Aspect | Status |
 |--------|--------|
-| Run Now button | ✅ Implemented (`TaskView.vue:502`) |
-| `runTask()` handler | ✅ Implemented (`TaskView.vue:387`) |
+| Run Now button | ✅ Implemented (`TaskView.vue:547`) |
+| `runTask()` handler | ✅ Implemented (`TaskView.vue:406`) |
 | Button disabled states (running, disabled) | ✅ Implemented (`disabled` bindings) |
 | Record start in run history | ✅ Implemented (`TaskRunRecorder.recordStart`) |
 | Task executor (COM trigger) | ✅ Implemented (`TauriTaskExecutor.run`) |
@@ -379,7 +381,6 @@ async function loadRuns() {
 **Optional future work (not required for correctness):**
 
 - Show per-task stdout/stderr inline in the run history row (currently only finalizePending reads log files; Run Now only captures error stderr on failure)
-- Add a "Run Now" spinner or progress indicator on the button
 - Surface the running task's PID or timeout status
 - Add a confirmation dialog before Run Now for destructive tasks
 
