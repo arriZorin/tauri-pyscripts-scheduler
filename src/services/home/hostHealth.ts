@@ -1,11 +1,14 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { RequirementCheckResult } from '../runtimeCheck/types'
 
+export type HealthStatus = 'ok' | 'warning' | 'error'
+
 export interface HostHealthItem {
   /** Stable test/hook key — independent of the user-facing label. */
   key: string
   label: string
-  ok: boolean
+  /** Drives the per-item icon (✓ / ! / ✗) and the card aggregate. */
+  status: HealthStatus
   detail: string
 }
 
@@ -28,11 +31,12 @@ export interface HostHealthService {
  *   has no effect on the app.
  * - **App data writable** — writes a temporary marker to the app data dir
  *   and deletes it.
- * - **Disk free space** — queries free bytes on the system drive.
- *   Warning if < 500 MB, failing if < 100 MB.
+ * - **Disk free space** — queries free bytes on the app-data drive.
+ *   Warning if < 500 MB, error if < 100 MB.
  * - **Python runtime (uv)** — reads the cached startup check result. The app
  *   delegates Python to uv, so this reports on the uv manager, not a Python
- *   interpreter.
+ *   interpreter. `notMet`/`deferred` are warnings (fixable in-app via
+ *   Resolve), `failed` is an error.
  */
 export async function checkHostHealth(runtimeResult?: RequirementCheckResult | null): Promise<HostHealthResult> {
   const items: HostHealthItem[] = []
@@ -54,10 +58,10 @@ export async function checkHostHealth(runtimeResult?: RequirementCheckResult | n
   // 5. Python runtime
   checkPythonRuntime(items, runtimeResult)
 
-  const failing = items.filter(i => !i.ok).length
-  const warnings = items.filter(i => i.ok && i.detail.includes('Warning')).length
+  const errors = items.filter(i => i.status === 'error').length
+  const warnings = items.filter(i => i.status === 'warning').length
   const status: HostHealthResult['status'] =
-    failing > 0 ? 'failing' : warnings > 0 ? 'warning' : 'ok'
+    errors > 0 ? 'failing' : warnings > 0 ? 'warning' : 'ok'
 
   return { items, status }
 }
@@ -68,14 +72,14 @@ async function checkTaskScheduler(items: HostHealthItem[]): Promise<void> {
     items.push({
       key: 'task-scheduler',
       label: 'Task Scheduler',
-      ok: true,
+      status: 'ok',
       detail: 'COM API responds',
     })
   } catch {
     items.push({
       key: 'task-scheduler',
       label: 'Task Scheduler',
-      ok: false,
+      status: 'error',
       detail: 'Service unavailable — creating/running tasks will fail',
     })
   }
@@ -88,14 +92,14 @@ async function checkWinget(items: HostHealthItem[]): Promise<void> {
       items.push({
         key: 'winget',
         label: 'Winget',
-        ok: true,
+        status: 'ok',
         detail: 'Found — primary uv bootstrap path available',
       })
     } else {
       items.push({
         key: 'winget',
         label: 'Winget',
-        ok: true,
+        status: 'ok',
         detail: 'Not found — uv bootstrap will use zip download fallback',
       })
     }
@@ -103,7 +107,7 @@ async function checkWinget(items: HostHealthItem[]): Promise<void> {
     items.push({
       key: 'winget',
       label: 'Winget',
-      ok: true,
+      status: 'ok',
       detail: 'Could not check — zip fallback will be used',
     })
   }
@@ -120,14 +124,14 @@ async function checkAppDataWritable(items: HostHealthItem[]): Promise<void> {
       items.push({
         key: 'app-data-dir',
         label: 'App Data Dir',
-        ok: true,
+        status: 'ok',
         detail: 'Writable — persistence layer works',
       })
     } else {
       items.push({
         key: 'app-data-dir',
         label: 'App Data Dir',
-        ok: false,
+        status: 'error',
         detail: 'Write verification failed',
       })
     }
@@ -135,7 +139,7 @@ async function checkAppDataWritable(items: HostHealthItem[]): Promise<void> {
     items.push({
       key: 'app-data-dir',
       label: 'App Data Dir',
-      ok: false,
+      status: 'error',
       detail: 'Not writable — all persistence operations will fail',
     })
   }
@@ -156,14 +160,14 @@ async function checkDiskFreeSpace(items: HostHealthItem[]): Promise<void> {
       items.push({
         key: 'disk-space',
         label: 'Disk Space',
-        ok: false,
+        status: 'error',
         detail: `${freeMb} MB free — critical, below 100 MB`,
       })
     } else if (freeMb < 500) {
       items.push({
         key: 'disk-space',
         label: 'Disk Space',
-        ok: true,
+        status: 'warning',
         detail: `Warning: only ${freeMb} MB free — below 500 MB`,
       })
     } else {
@@ -171,7 +175,7 @@ async function checkDiskFreeSpace(items: HostHealthItem[]): Promise<void> {
       items.push({
         key: 'disk-space',
         label: 'Disk Space',
-        ok: true,
+        status: 'ok',
         detail: `${gb} GB free`,
       })
     }
@@ -179,7 +183,7 @@ async function checkDiskFreeSpace(items: HostHealthItem[]): Promise<void> {
     items.push({
       key: 'disk-space',
       label: 'Disk Space',
-      ok: true,
+      status: 'warning',
       detail: 'Could not query',
     })
   }
@@ -190,7 +194,7 @@ function checkPythonRuntime(items: HostHealthItem[], result: RequirementCheckRes
     items.push({
       key: 'python-runtime',
       label: 'uv (Python manager)',
-      ok: true,
+      status: 'ok',
       detail: 'Checking...',
     })
     return
@@ -200,7 +204,7 @@ function checkPythonRuntime(items: HostHealthItem[], result: RequirementCheckRes
       items.push({
         key: 'python-runtime',
         label: 'uv (Python manager)',
-        ok: true,
+        status: 'ok',
         detail: `uv found — Python resolves per-venv when tasks run${result.resolvedPath ? ` (${result.resolvedPath})` : ''}`,
       })
       break
@@ -209,7 +213,7 @@ function checkPythonRuntime(items: HostHealthItem[], result: RequirementCheckRes
       items.push({
         key: 'python-runtime',
         label: 'uv (Python manager)',
-        ok: true,
+        status: 'warning',
         detail: `Warning: ${result.message}`,
       })
       break
@@ -217,7 +221,7 @@ function checkPythonRuntime(items: HostHealthItem[], result: RequirementCheckRes
       items.push({
         key: 'python-runtime',
         label: 'uv (Python manager)',
-        ok: false,
+        status: 'error',
         detail: result.message,
       })
       break

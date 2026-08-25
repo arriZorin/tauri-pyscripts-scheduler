@@ -216,7 +216,8 @@ onMounted(() => {
               </div>
               <div v-if="hostHealthResult" class="mt-3 space-y-2">
                 <div v-for="(item, idx) in hostHealthResult.items" :key="idx" class="flex items-center gap-2 text-sm" :data-testid="`health-${item.key}`">
-                  <span v-if="item.ok" class="text-green-600">&#10003;</span>
+                  <span v-if="item.status === 'ok'" class="text-green-600">&#10003;</span>
+                  <span v-else-if="item.status === 'warning'" class="text-amber-500 font-bold" aria-label="warning">!</span>
                   <span v-else class="text-red-600">&#10007;</span>
                   <span class="font-medium">{{ item.label }}:</span>
                   <span class="opacity-70">{{ item.detail }}</span>

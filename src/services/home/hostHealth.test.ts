@@ -3,6 +3,7 @@ import type { HostHealthResult } from './hostHealth'
 import type { RequirementCheckResult } from '../runtimeCheck/types'
 
 const invokeMock = vi.fn()
+let freeBytes = 5 * 1024 * 1024 * 1024 // 5 GiB default
 
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: (...args: unknown[]) => invokeMock(...args),
@@ -22,6 +23,7 @@ function runtimeResult(status: RequirementCheckResult['status']): RequirementChe
 
 beforeEach(() => {
   invokeMock.mockReset()
+  freeBytes = 5 * 1024 * 1024 * 1024
   invokeMock.mockImplementation((cmd: string) => {
     switch (cmd) {
       case 'list_scheduled_tasks':
@@ -35,7 +37,7 @@ beforeEach(() => {
       case 'get_app_data_dir':
         return Promise.resolve('C:\\Users\\me\\AppData\\Local\\com.pyscriptscheduler.app')
       case 'get_disk_free_space':
-        return Promise.resolve(5 * 1024 * 1024 * 1024) // 5 GiB
+        return Promise.resolve(freeBytes)
       default:
         return Promise.resolve(null)
     }
@@ -55,7 +57,7 @@ describe('checkHostHealth', () => {
 
     const disk = result.items.find((i) => i.label === 'Disk Space')
     expect(disk?.detail).toBe('5.0 GB free')
-    expect(disk?.ok).toBe(true)
+    expect(disk?.status).toBe('ok')
   })
 
   it('skips the winget probe when uv is met', async () => {
@@ -78,11 +80,35 @@ describe('checkHostHealth', () => {
     const item = result.items.find((i) => i.label.includes('uv'))
     expect(item?.label).toBe('uv (Python manager)')
     expect(item?.key).toBe('python-runtime')
+    expect(item?.status).toBe('ok')
     expect(item?.detail).toContain('per-venv')
-    expect(item?.ok).toBe(true)
   })
 
-  it('falls back to "Could not query" when the disk invoke fails', async () => {
+  it('marks the uv item as a warning when not met', async () => {
+    const result = await checkHostHealth(runtimeResult('notMet'))
+
+    const item = result.items.find((i) => i.key === 'python-runtime')
+    expect(item?.status).toBe('warning')
+  })
+
+  it('marks the uv item as an error when the runtime check failed', async () => {
+    const result = await checkHostHealth(runtimeResult('failed'))
+
+    const item = result.items.find((i) => i.key === 'python-runtime')
+    expect(item?.status).toBe('error')
+  })
+
+  it('marks disk space as a warning below 500 MB and an error below 100 MB', async () => {
+    freeBytes = 300 * 1024 * 1024
+    const warning = await checkHostHealth(runtimeResult('met'))
+    expect(warning.items.find((i) => i.key === 'disk-space')?.status).toBe('warning')
+
+    freeBytes = 50 * 1024 * 1024
+    const failing = await checkHostHealth(runtimeResult('met'))
+    expect(failing.items.find((i) => i.key === 'disk-space')?.status).toBe('error')
+  })
+
+  it('marks disk space as a warning when the query fails (not a green check)', async () => {
     invokeMock.mockImplementation((cmd: string) => {
       if (cmd === 'get_app_data_dir') return Promise.reject(new Error('no dir'))
       return Promise.resolve(null)
@@ -90,8 +116,19 @@ describe('checkHostHealth', () => {
 
     const result = await checkHostHealth(runtimeResult('met'))
 
-    const disk = result.items.find((i) => i.label === 'Disk Space')
+    const disk = result.items.find((i) => i.key === 'disk-space')
     expect(disk?.detail).toBe('Could not query')
-    expect(disk?.ok).toBe(true)
+    expect(disk?.status).toBe('warning')
+  })
+
+  it('aggregates to ok / warning / failing from item statuses', async () => {
+    const allOk = await checkHostHealth(runtimeResult('met'))
+    expect(allOk.status).toBe('ok')
+
+    const warned = await checkHostHealth(runtimeResult('notMet'))
+    expect(warned.status).toBe('warning')
+
+    const broken = await checkHostHealth(runtimeResult('failed'))
+    expect(broken.status).toBe('failing')
   })
 })

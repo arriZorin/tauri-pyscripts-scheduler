@@ -253,7 +253,7 @@ The function is pure (no I/O) — that is what makes `dashboardStats.test.ts` un
 
 ### Step 4 — Host Health Checks
 
-**Location:** `src/services/home/hostHealth.ts:37-62`
+**Location:** `src/services/home/hostHealth.ts:41-66`
 
 ```ts
 export async function checkHostHealth(runtimeResult?: RequirementCheckResult | null): Promise<HostHealthResult> {
@@ -272,10 +272,10 @@ export async function checkHostHealth(runtimeResult?: RequirementCheckResult | n
   // 5. Python runtime
   checkPythonRuntime(items, runtimeResult)
 
-  const failing = items.filter(i => !i.ok).length
-  const warnings = items.filter(i => i.ok && i.detail.includes('Warning')).length
+  const errors = items.filter(i => i.status === 'error').length
+  const warnings = items.filter(i => i.status === 'warning').length
   const status: HostHealthResult['status'] =
-    failing > 0 ? 'failing' : warnings > 0 ? 'warning' : 'ok'
+    errors > 0 ? 'failing' : warnings > 0 ? 'warning' : 'ok'
 
   return { items, status }
 }
@@ -283,15 +283,15 @@ export async function checkHostHealth(runtimeResult?: RequirementCheckResult | n
 
 **Behaviour:**
 
-1. **Task Scheduler** (`:65-80`) — invokes `list_scheduled_tasks`; an error means the COM Schedule service is down/permission-blocked → `ok: false`.
-2. **Winget** (`:84-109`) — `find_all_in_path_command { name: 'winget' }` PATH scan, **only while uv is unresolved** (`checkHostHealth` gates it on `status !== 'met'`). This probe never fails the card: both "not found" and "could not check" keep `ok: true` and only note that the uv bootstrap will use the zip-download fallback. Once uv is met, the item is omitted entirely.
-3. **App Data Dir** (`:112-141`) — writes `_hermes_health_marker` via `write_text_file`, reads it back, then overwrites to clean up; failure → `ok: false` ("all persistence operations will fail").
-4. **Disk Space** (`:144-184`) — `get_app_data_dir` (Rust) resolves the app data dir, then `get_disk_free_space` queries the drive that holds it (where persistence + venvs live). `< 100 MB` failing, `< 500 MB` warning, else `x.x GB free`. This deliberately avoids `process.env` — it is **not** available in the Tauri webview, so the old code always fell back to "Could not query".
-5. **uv / Python manager** (`:188-224`) — reads the **cached** startup `runtimeResult`. The item is labelled "uv (Python manager)" because the app delegates Python to uv; when met the detail explains "uv found — Python resolves per-venv when tasks run" plus the resolved uv path, rather than reporting a raw binary path under a "Python Runtime" heading. `notMet`/`deferred` become a `Warning` detail, `failed` → `ok: false`. This is why `loadStats` passes `runtimeResult.value` in.
+1. **Task Scheduler** (`:69-85`) — invokes `list_scheduled_tasks`; an error means the COM Schedule service is down/permission-blocked → `status: 'error'`.
+2. **Winget** (`:88-113`) — `find_all_in_path_command { name: 'winget' }` PATH scan, **only while uv is unresolved** (`checkHostHealth` gates it on `status !== 'met'`). This probe never warns or fails the card: "found", "not found" and "could not check" all keep `status: 'ok'` and only note how a future uv bootstrap would proceed (winget vs zip fallback). Once uv is met, the item is omitted entirely.
+3. **App Data Dir** (`:116-145`) — writes `_hermes_health_marker` via `write_text_file`, reads it back, then overwrites to clean up; failure → `status: 'error'` ("all persistence operations will fail").
+4. **Disk Space** (`:148-189`) — `get_app_data_dir` (Rust) resolves the app data dir, then `get_disk_free_space` queries the drive that holds it (where persistence + venvs live). `< 100 MB` → `status: 'error'`, `< 500 MB` → `status: 'warning'`, else `status: 'ok'` (`x.x GB free`). A query failure ("Could not query") is `status: 'warning'` — never a green check. This deliberately avoids `process.env` — it is **not** available in the Tauri webview, so the old code always fell back to "Could not query".
+5. **uv / Python manager** (`:192-227`) — reads the **cached** startup `runtimeResult`. The item is labelled "uv (Python manager)" because the app delegates Python to uv; when met the detail explains "uv found — Python resolves per-venv when tasks run" plus the resolved uv path, rather than reporting a raw binary path under a "Python Runtime" heading. `met` → `status: 'ok'`; `notMet`/`deferred` → `status: 'warning'` (recoverable in-app via Resolve); `failed` → `status: 'error'`. This is why `loadStats` passes `runtimeResult.value` in.
 
-Each item carries a stable `key` (`task-scheduler`, `winget`, `app-data-dir`, `disk-space`, `python-runtime`) that drives the `health-*` test ids (`HomeView.vue:218`) — independent of the user-facing label.
+Each item carries a stable `key` (`task-scheduler`, `winget`, `app-data-dir`, `disk-space`, `python-runtime`) that drives the `health-*` test ids (`HomeView.vue:218`), and a `status` that drives the per-item icon — green ✓ / amber ! / red ✗ — independent of the user-facing label.
 
-The card aggregates into one status badge — `All ok` / `Warnings` / `Failing` — and lists each probe with ✓/✗ (`HomeView.vue:205-233`).
+The card aggregates into one status badge — `All ok` / `Warnings` / `Failing` — from the item `status` values (any `error` → `failing`, else any `warning` → `warning`, else `ok`) and lists each probe with its three-state icon (`HomeView.vue:205-233`).
 
 **Flow chain:**
 `hostHealth.check(runtimeResult)` → probes over the generic commands (COM-backed `list_scheduled_tasks`; PATH-scan `find_all_in_path_command` when uv unresolved; writability `write_text_file`/`read_text_file`; `get_app_data_dir` + `get_disk_free_space`; cached runtime result) → `{ items, status }` → `hostHealthResult` ref → Host Health card

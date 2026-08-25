@@ -59,12 +59,12 @@ const emptyOverrides = {
   taskRepository: { list: async () => [] } as never,
   taskRunRepository: { list: async () => [] } as never,
   hostHealth: { check: async (runtimeResult?: RequirementCheckResult | null): Promise<HostHealthResult> => {
-    const items: { key: string; label: string; ok: boolean; detail: string }[] = []
+    const items: { key: string; label: string; status: 'ok' | 'warning' | 'error'; detail: string }[] = []
     if (runtimeResult) {
       items.push({
         key: 'python-runtime',
         label: 'uv (Python manager)',
-        ok: runtimeResult.status === 'met' || runtimeResult.status === 'notMet' || runtimeResult.status === 'deferred',
+        status: runtimeResult.status === 'failed' ? 'error' : runtimeResult.status === 'met' ? 'ok' : 'warning',
         detail: runtimeResult.status === 'met' ? runtimeResult.message : `Warning: ${runtimeResult.message}`,
       })
     }
@@ -196,6 +196,21 @@ describe('HomeView runtime requirement card', () => {
     const resolveButton = container.querySelector('[data-testid="resolve-runtime"]') as HTMLButtonElement
     expect(resolveButton).not.toBeNull()
     expect(resolveButton.textContent).toContain('Try again')
+
+    app.unmount()
+    document.body.removeChild(container)
+  })
+
+  it('renders an exclamation mark for warning health items (not a green check)', async () => {
+    const { container, app } = await mountHome({
+      ...emptyOverrides,
+      runtimeCheckResult: ref(runtimeResult('notMet')),
+    })
+
+    const healthItem = container.querySelector('[data-testid="health-python-runtime"]')
+    expect(healthItem).toBeTruthy()
+    expect(healthItem?.textContent).toContain('!')
+    expect(healthItem?.textContent).not.toContain('\u2713')
 
     app.unmount()
     document.body.removeChild(container)
