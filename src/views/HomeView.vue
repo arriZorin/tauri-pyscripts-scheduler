@@ -52,6 +52,7 @@ const loaded = ref(false);
 // (App.vue).  No locator probe runs when this view mounts.
 const runtimeResult = computed(() => runtimeCheckResult.value);
 const runtimeResolving = ref(false);
+const refreshingHealth = ref(false);
 
 async function loadStats() {
   const [scripts, loadedTasks, runs, health]: [Script[], Task[], TaskRun[], HostHealthResult | null] = await Promise.all([
@@ -67,6 +68,17 @@ async function loadStats() {
   stats.value = computeDashboardStats(scripts, loadedTasks, runs);
   hostHealthResult.value = health;
   loaded.value = true;
+}
+
+async function refreshHealth() {
+  refreshingHealth.value = true;
+  try {
+    hostHealthResult.value = await hostHealth.check(runtimeResult.value);
+  } catch {
+    // Keep the last known result if a manual refresh fails.
+  } finally {
+    refreshingHealth.value = false;
+  }
 }
 
 async function resolveRuntime() {
@@ -209,10 +221,26 @@ onMounted(() => {
                   <h2 class="card-title">Host Health</h2>
                   <p class="text-sm opacity-70">Environment checks that could affect app behaviour.</p>
                 </div>
-                <span v-if="!hostHealthResult" class="loading loading-spinner loading-sm" aria-label="Checking host health"></span>
-                <span v-else-if="hostHealthResult.status === 'ok'" class="badge badge-success">All ok</span>
-                <span v-else-if="hostHealthResult.status === 'warning'" class="badge badge-warning">Warnings</span>
-                <span v-else class="badge badge-error">Failing</span>
+                <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    class="btn btn-xs btn-circle border-black"
+                    data-testid="refresh-health"
+                    aria-label="Refresh host health"
+                    title="Refresh host health"
+                    :disabled="refreshingHealth"
+                    @click="refreshHealth"
+                  >
+                    <svg v-if="!refreshingHealth" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="h-4 w-4 stroke-current">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span v-else class="loading loading-spinner loading-sm"></span>
+                  </button>
+                  <span v-if="!hostHealthResult" class="loading loading-spinner loading-sm" aria-label="Checking host health"></span>
+                  <span v-else-if="hostHealthResult.status === 'ok'" class="badge badge-success">All ok</span>
+                  <span v-else-if="hostHealthResult.status === 'warning'" class="badge badge-warning">Warnings</span>
+                  <span v-else class="badge :w-4badge-error">Failing</span>
+                </div>
               </div>
               <div v-if="hostHealthResult" class="mt-3 space-y-2">
                 <div v-for="(item, idx) in hostHealthResult.items" :key="idx" class="flex items-center gap-2 text-sm" :data-testid="`health-${item.key}`">

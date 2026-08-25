@@ -283,9 +283,9 @@ export async function checkHostHealth(runtimeResult?: RequirementCheckResult | n
 3. **App Data Dir** (`:111-140`) — writes `_hermes_health_marker` via `write_text_file`, reads it back, then overwrites to clean up; failure → `status: 'error'` ("all persistence operations will fail").
 4. **uv / Python manager** (`:143-178`) — reads the **cached** startup `runtimeResult`. The item is labelled "uv (Python manager)" because the app delegates Python to uv; when met the detail explains "uv found — Python resolves per-venv when tasks run" plus the resolved uv path, rather than reporting a raw binary path under a "Python Runtime" heading. `met` → `status: 'ok'`; `notMet`/`deferred` → `status: 'warning'` (recoverable in-app via Resolve); `failed` → `status: 'error'`. This is why `loadStats` passes `runtimeResult.value` in.
 
-Each item carries a stable `key` (`task-scheduler`, `winget`, `app-data-dir`, `python-runtime`) that drives the `health-*` test ids (`HomeView.vue:218`), and a `status` that drives the per-item icon — green ✓ / amber ! / red ✗ — independent of the user-facing label.
+Each item carries a stable `key` (`task-scheduler`, `winget`, `app-data-dir`, `python-runtime`) that drives the `health-*` test ids (`HomeView.vue:246`), and a `status` that drives the per-item icon — green ✓ / amber ! / red ✗ — independent of the user-facing label.
 
-The card aggregates into one status badge — `All ok` / `Warnings` / `Failing` — from the item `status` values (any `error` → `failing`, else any `warning` → `warning`, else `ok`) and lists each probe with its three-state icon (`HomeView.vue:205-233`).
+The card aggregates into one status badge — `All ok` / `Warnings` / `Failing` — from the item `status` values (any `error` → `failing`, else any `warning` → `warning`, else `ok`) and lists each probe with its three-state icon (`HomeView.vue:217-262`). A refresh icon button (`HomeView.vue:226-239`, `data-testid="refresh-health"`) re-runs `hostHealth.check` manually via `refreshHealth()` (`HomeView.vue:73-82`) — the spinner swaps in while refreshing, and a failed manual refresh keeps the last known result.
 
 **Flow chain:**
 `hostHealth.check(runtimeResult)` → probes over the generic commands (COM-backed `list_scheduled_tasks`; PATH-scan `find_all_in_path_command` when uv unresolved; writability `write_text_file`/`read_text_file`; cached runtime result) → `{ items, status }` → `hostHealthResult` ref → Host Health card
@@ -294,7 +294,7 @@ The card aggregates into one status badge — `All ok` / `Warnings` / `Failing` 
 
 ### Step 5 — Recent Executions & Empty States
 
-**Location:** `src/views/HomeView.vue:235-257`
+**Location:** `src/views/HomeView.vue:264-286`
 
 ```html
 <section class="mt-6" data-testid="recent-executions">
@@ -315,7 +315,7 @@ The card aggregates into one status badge — `All ok` / `Warnings` / `Failing` 
 
 1. `recentRuns` (5 newest, Step 2) renders as a zebra table; `taskName(run.taskId)` (`:93-95`) resolves the run's task name, falling back to the raw id.
 2. Empty history shows the `recent-executions-empty` alert — "No executions yet." — because `task-runs.json` is absent on a fresh start (see Step 6).
-3. The first-run hint (`:255-257`) renders only when `loaded && totalScripts === 0 && totalTasks === 0`.
+3. The first-run hint (`:285-287`) renders only when `loaded && totalScripts === 0 && totalTasks === 0`.
 4. The three stat cards are `<button>`s whose `@click` calls `onNavigate` — `stat-scripts` → Scripts List, `stat-tasks`/`stat-next-run` → Task, `stat-runs`/`stat-runs-today` → Logging.
 
 **Flow chain:**
@@ -371,8 +371,8 @@ HomeView (onMounted)
 | View mount + kick-off     | ✅ Implemented (`App.vue:36-51`, `HomeView.vue:110`) |
 | Parallel stats loader     | ✅ Implemented (`HomeView.vue:56-70`)         |
 | Dashboard aggregation     | ✅ Implemented (`dashboardStats.ts:39`)       |
-| Host Health probes        | ✅ Implemented (`hostHealth.ts:37`)           |
-| Recent executions (top 5) | ✅ Implemented (`HomeView.vue:235`)           |
+| Host Health probes        | ✅ Implemented (`hostHealth.ts:39`)           |
+| Recent executions (top 5) | ✅ Implemented (`HomeView.vue:264`)           |
 | Stat-card navigation      | ✅ Implemented (`onNavigate` → `setView`)     |
 | Persistence (null → [])   | ✅ Implemented (`Json*Repository` over `TauriFileStorage`) |
 | Empty states              | ✅ Implemented ("No executions yet.", first-run hint) |

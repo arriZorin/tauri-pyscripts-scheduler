@@ -315,9 +315,9 @@ onMounted(() => { loadStats(); });
 
 1. Parallel repository reads — each hits `read_text_file`; a missing file returns `null`, so each repository yields `[]`.
 2. `computeDashboardStats` (`dashboardStats.ts:39`) aggregates totals — all zeros on a fresh start. It tracks `usedScripts`/`unusedScripts` by cross-referencing task `scriptId` values against script `id` values: a `usedScriptIds` set (`dashboardStats.ts:44`) collects every `task.scriptId`, then `usedScripts = scripts.filter(s => usedScriptIds.has(s.id)).length` and `unusedScripts = scripts.length - usedScripts`.
-3. `hostHealth.check(runtimeResult.value)` (`hostHealth.ts:39`) probes host preconditions — Task Scheduler COM, winget on PATH (only while uv is unresolved), app-data-dir writability, and the cached Python runtime (reported as "uv (Python manager)") — aggregated to an `All ok` / `Warnings` / `Failing` card (`HomeView.vue:205-233`). On a fresh machine every probe degrades gracefully (missing winget → zip-fallback note).
-4. Runtime panel renders the cached `runtimeCheckResult` — on a fresh machine: badge `Not met`, message "uv is not installed.", **Resolve** button (`HomeView.vue:226-231`).
-5. The first-run hint (`HomeView.vue:255-257`):
+3. `hostHealth.check(runtimeResult.value)` (`hostHealth.ts:39`) probes host preconditions — Task Scheduler COM, winget on PATH (only while uv is unresolved), app-data-dir writability, and the cached Python runtime (reported as "uv (Python manager)") — aggregated to an `All ok` / `Warnings` / `Failing` card with a manual refresh icon (`HomeView.vue:217-262`). On a fresh machine every probe degrades gracefully (missing winget → zip-fallback note).
+4. Runtime panel renders the cached `runtimeCheckResult` — on a fresh machine: badge `Not met`, message "uv is not installed.", **Resolve** button (`HomeView.vue:255-260`).
+5. The first-run hint (`HomeView.vue:285-287`):
 
 ```html
 <p v-if="loaded && stats.totalScripts === 0 && stats.totalTasks === 0" class="text-gray-500 mt-4">
@@ -331,11 +331,11 @@ Every primary view degrades gracefully on a fresh start:
 
 | View | Empty state |
 |------|-------------|
-| Home | Dashboard zeros + "No scripts or tasks yet." hint (`HomeView.vue:255`) |
+| Home | Dashboard zeros + "No scripts or tasks yet." hint (`HomeView.vue:285`) |
 | Scripts List | "No scripts yet. Add a .py file or folder." (`ScriptsListView.vue:153`) |
 | Task | "No tasks yet." (`TaskView.vue:462`) |
 | Task run history | "No runs yet." (`TaskView.vue:505`) |
-| Home recent executions | "No executions yet." (`HomeView.vue:237`) |
+| Home recent executions | "No executions yet." (`HomeView.vue:266`) |
 
 Each view's `onMounted` loads its own data (ScriptsListView `loadAndReconcile` at `:424-426`, TaskView `load()` + `loadRuns()` at `:432-435`), all of which resolve to empty lists when the JSON files do not exist yet. First writes (e.g. Add File → `scripts.json`) create the files on demand through `write_text_file` (`lib.rs:127-150`).
 

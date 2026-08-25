@@ -215,4 +215,37 @@ describe('HomeView runtime requirement card', () => {
     app.unmount()
     document.body.removeChild(container)
   })
+
+  it('re-runs the host health check when the refresh icon is clicked', async () => {
+    let calls = 0
+    const healthSpy = {
+      check: async (): Promise<HostHealthResult> => {
+        calls += 1
+        return {
+          items: [{ key: 'python-runtime', label: 'uv (Python manager)', status: 'ok', detail: 'ok' }],
+          status: 'ok',
+        }
+      },
+    }
+
+    const { container, app } = await mountHome({
+      ...emptyOverrides,
+      hostHealth: healthSpy as never,
+      runtimeCheckResult: ref(runtimeResult('met')),
+    })
+    expect(calls).toBe(1)
+
+    const refreshButton = container.querySelector('[data-testid="refresh-health"]') as HTMLButtonElement
+    expect(refreshButton).not.toBeNull()
+    refreshButton.click()
+    for (let index = 0; index < 5; index += 1) {
+      await nextTick()
+      await Promise.resolve()
+    }
+
+    expect(calls).toBe(2)
+
+    app.unmount()
+    document.body.removeChild(container)
+  })
 })
