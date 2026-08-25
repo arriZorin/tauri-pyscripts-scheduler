@@ -107,15 +107,6 @@ function runtimeStatusLabel(status: RequirementCheckResult['status']): string {
   }
 }
 
-function runtimeStatusBadge(status: RequirementCheckResult['status']): string {
-  switch (status) {
-    case 'met': return 'badge-success';
-    case 'notMet': return 'badge-warning';
-    case 'deferred': return 'badge-warning';
-    case 'failed': return 'badge-error';
-  }
-}
-
 onMounted(() => {
   loadStats();
 });
@@ -224,7 +215,7 @@ onMounted(() => {
                 <span v-else class="badge badge-error">Failing</span>
               </div>
               <div v-if="hostHealthResult" class="mt-3 space-y-2">
-                <div v-for="(item, idx) in hostHealthResult.items" :key="idx" class="flex items-center gap-2 text-sm" :data-testid="`health-${item.label.toLowerCase().replace(/\s+/g, '-')}`">
+                <div v-for="(item, idx) in hostHealthResult.items" :key="idx" class="flex items-center gap-2 text-sm" :data-testid="`health-${item.key}`">
                   <span v-if="item.ok" class="text-green-600">&#10003;</span>
                   <span v-else class="text-red-600">&#10007;</span>
                   <span class="font-medium">{{ item.label }}:</span>

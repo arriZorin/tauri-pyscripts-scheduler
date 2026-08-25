@@ -13,7 +13,7 @@ When the app launches on a machine with no prior state (or with an empty data di
 1. **Vue entry** (`src/main.ts`) mounts `App.vue`, which builds the app context (DI wiring) and the sidebar shell.
 2. **App.vue boot** (`onMounted`) records an `app startup` log entry, then runs the **one-shot runtime check**: locate `uv` (managed install dir first, then PATH), cache the `RequirementCheckResult` in a reactive ref shared by all views.
 3. **Rust setup** creates the app-local data directory (`%LOCALAPPDATA%\com.pyscriptscheduler.app`) and manages it as Tauri state; the `logs\` subdirectory is created lazily by `get_log_directory`.
-4. **Home view** (`HomeView.vue`) loads stats in parallel (scripts, tasks, runs, system info), computes the dashboard, and shows the runtime requirement panel — with a **Resolve** button that bootstraps uv **winget-first** (silent `astral-sh.uv` install), falling back to a pinned portable zip download when winget fails or uv cannot be located, when the check is `notMet`.
+4. **Home view** (`HomeView.vue`) loads stats in parallel (scripts, tasks, runs, host health), computes the dashboard, and shows the runtime requirement panel — with a **Resolve** button that bootstraps uv **winget-first** (silent `astral-sh.uv` install), falling back to a pinned portable zip download when winget fails or uv cannot be located, when the check is `notMet`.
 5. **Empty state** — missing JSON files (`scripts.json`, `tasks.json`, `task-runs.json`, `logs.json`) read as `null` → every repository returns `[]`, so each view shows its first-run empty state ("No scripts yet.", "No tasks yet.", "No runs yet.", "No executions yet.").
 
 The entire fresh-start path is frontend orchestration over the existing generic Rust commands (file I/O, PATH scan, registry query, download/extract, process runner). No dedicated fresh-start command was required.
@@ -47,7 +47,7 @@ src/
 │   │   ├── versionRequirement.ts        ← version constraint parsing (unused at boot)
 │   │   └── types.ts                     ← RequirementCheckResult / RuntimeRequirement
 │   ├── home/
-│   │   ├── systemInfo.ts                ← app version vs host version (matched/mismatch)
+│   │   ├── hostHealth.ts                ← host-env probes (COM/winget/writable/disk/python; winget only while uv unresolved)
 │   │   └── dashboardStats.ts            ← pure stats aggregation
 │   ├── script/JsonScriptRepository.ts   ← reads scripts.json (missing → [])
 │   ├── task/JsonTaskRepository.ts       ← reads tasks.json (missing → [])
@@ -65,11 +65,11 @@ src/
 | `src/App.vue` | Context creation, sidebar shell, startup log + runtime check |
 | `src/composables/useAppContext.ts` | Production DI wiring + `runtimeCheckResult` ref |
 | `src/composables/useNavigation.ts` | Nav items; default view `home` |
-| `src/views/HomeView.vue` | Dashboard stats, system info, runtime panel, Resolve button |
+| `src/views/HomeView.vue` | Dashboard stats, Host Health, runtime panel, Resolve button |
 | `src/services/runtimeCheck/pythonRuntimeCheck.ts` | uv locate → `met` / `notMet`; `resolve()` bootstraps |
 | `src/services/runtimeCheck/uvBootstrapper.ts` | winget-first uv bootstrap (pinned zip fallback) |
 | `src/services/runtimeCheck/environmentQuery.ts` / `processRunner.ts` / `fileDownloader.ts` | Tauri invoke adapters |
-| `src/services/home/systemInfo.ts` / `dashboardStats.ts` | Version compare + stats |
+| `src/services/home/hostHealth.ts` / `dashboardStats.ts` | Host-health probes + stats |
 | `src/services/shared/TauriFileStorage.ts` | `read_text_file` → `null` when file absent |
 
 ---
@@ -115,7 +115,7 @@ export function createAppContext(overrides: Partial<AppContext> = {}): AppContex
 }
 ```
 
-`App.vue` creates and provides it before any view mounts (`App.vue:31-32`); views read the cached runtime result from the reactive ref instead of re-probing (`HomeView.vue:43`). Tests supply fakes at the same boundary (`useAppContext` overrides).
+`App.vue` creates and provides it before any view mounts (`App.vue:31-32`); views read the cached runtime result from the reactive ref instead of re-probing (`HomeView.vue:53`). Tests supply fakes at the same boundary (`useAppContext` overrides).
 
 ---
 
@@ -230,7 +230,7 @@ The app never probes host Python directly — Python version management is deleg
 
 ### Step 2b — Resolve: uv Bootstrap (winget-first)
 
-**Location:** `src/views/HomeView.vue:62-81` (button) → `src/services/runtimeCheck/uvBootstrapper.ts:39-51`
+**Location:** `src/views/HomeView.vue:72-91` (button) → `src/services/runtimeCheck/uvBootstrapper.ts:39-51`
 
 ```ts
 async resolveRuntime() {
@@ -289,20 +289,22 @@ All are generic primitives — none is specific to fresh start.
 
 ### Step 4 — Home Dashboard (fresh start view)
 
-**Location:** `src/views/HomeView.vue:46-60` (load), `:109-111` (mount)
+**Location:** `src/views/HomeView.vue:56-70` (load), `:110-112` (mount)
 
 ```ts
 async function loadStats() {
-  const [scripts, loadedTasks, runs, loadedSystemInfo] = await Promise.all([
+  const [scripts, loadedTasks, runs, health]: [Script[], Task[], TaskRun[], HostHealthResult | null] = await Promise.all([
     scriptRepository.list().catch(() => [] as Script[]),
     taskRepository.list().catch(() => [] as Task[]),
     taskRunRepository.list().catch(() => [] as TaskRun[]),
-    systemInfoService.load().catch(() => null),
+    hostHealth.check(runtimeResult.value).catch(() => null),
   ]);
   tasks.value = loadedTasks;
-  recentRuns.value = [...runs].sort((l, r) => Date.parse(r.startedAt) - Date.parse(l.startedAt)).slice(0, 5);
+  recentRuns.value = [...runs]
+    .sort((left, right) => Date.parse(right.startedAt) - Date.parse(left.startedAt))
+    .slice(0, 5);
   stats.value = computeDashboardStats(scripts, loadedTasks, runs);
-  systemInfo.value = loadedSystemInfo;
+  hostHealthResult.value = health;
   loaded.value = true;
 }
 
@@ -311,11 +313,11 @@ onMounted(() => { loadStats(); });
 
 **Behaviour:**
 
-1. Parallel repository reads — each hits `read_text_file`; a missing file returns `null` (`lib.rs:112-116`), so each repository yields `[]`.
-2. `computeDashboardStats` (`dashboardStats.ts:23-45`) aggregates totals — all zeros on a fresh start. The interface now tracks `usedScripts`/`unusedScripts` by cross-referencing task `scriptId` values against script `id` values. A `usedScriptIds` set (`dashboardStats.ts:28`) collects all IDs referenced by at least one task, then `usedScripts = scripts.filter(s => usedScriptIds.has(s.id)).length` and `unusedScripts = scripts.length - usedScripts`.
-3. `systemInfoService.load()` (`systemInfo.ts:29-35`) compares `package.json` version against `getVersion()` from the Tauri app API → `matched` / `mismatch` / `unavailable` badge.
-4. Runtime panel renders the cached `runtimeCheckResult` — on a fresh machine: badge `Not met`, message "uv is not installed.", **Resolve** button (`HomeView.vue:199-205`).
-5. The first-run hint (`HomeView.vue:230-232`):
+1. Parallel repository reads — each hits `read_text_file`; a missing file returns `null`, so each repository yields `[]`.
+2. `computeDashboardStats` (`dashboardStats.ts:39`) aggregates totals — all zeros on a fresh start. It tracks `usedScripts`/`unusedScripts` by cross-referencing task `scriptId` values against script `id` values: a `usedScriptIds` set (`dashboardStats.ts:44`) collects every `task.scriptId`, then `usedScripts = scripts.filter(s => usedScriptIds.has(s.id)).length` and `unusedScripts = scripts.length - usedScripts`.
+3. `hostHealth.check(runtimeResult.value)` (`hostHealth.ts:37`) probes host preconditions — Task Scheduler COM, winget on PATH (only while uv is unresolved), app-data-dir writability, disk free space (resolved via `get_app_data_dir` + `get_disk_free_space`), and the cached Python runtime (reported as "uv (Python manager)") — aggregated to an `All ok` / `Warnings` / `Failing` card (`HomeView.vue:205-233`). On a fresh machine every probe degrades gracefully (missing winget → zip-fallback note; disk query failure → "Could not query").
+4. Runtime panel renders the cached `runtimeCheckResult` — on a fresh machine: badge `Not met`, message "uv is not installed.", **Resolve** button (`HomeView.vue:226-231`).
+5. The first-run hint (`HomeView.vue:255-257`):
 
 ```html
 <p v-if="loaded && stats.totalScripts === 0 && stats.totalTasks === 0" class="text-gray-500 mt-4">
@@ -329,11 +331,11 @@ Every primary view degrades gracefully on a fresh start:
 
 | View | Empty state |
 |------|-------------|
-| Home | Dashboard zeros + "No scripts or tasks yet." hint (`HomeView.vue:230`) |
+| Home | Dashboard zeros + "No scripts or tasks yet." hint (`HomeView.vue:255`) |
 | Scripts List | "No scripts yet. Add a .py file or folder." (`ScriptsListView.vue:153`) |
 | Task | "No tasks yet." (`TaskView.vue:462`) |
 | Task run history | "No runs yet." (`TaskView.vue:505`) |
-| Home recent executions | "No executions yet." (`HomeView.vue:212`) |
+| Home recent executions | "No executions yet." (`HomeView.vue:237`) |
 
 Each view's `onMounted` loads its own data (ScriptsListView `loadAndReconcile` at `:424-426`, TaskView `load()` + `loadRuns()` at `:432-435`), all of which resolve to empty lists when the JSON files do not exist yet. First writes (e.g. Add File → `scripts.json`) create the files on demand through `write_text_file` (`lib.rs:127-150`).
 
@@ -350,11 +352,11 @@ Each view's `onMounted` loads its own data (ScriptsListView `loadAndReconcile` a
 | One-shot cached runtime check | ✅ Implemented (`pythonRuntimeCheck.ts:25`) |
 | uv locate (managed dir → PATH) | ✅ Implemented (`pythonRuntimeCheck.ts:75`) |
 | uv bootstrap resolve (winget-first + pinned zip fallback) | ✅ Implemented (`uvBootstrapper.ts:39`) |
-| Home dashboard + system info + runtime panel | ✅ Implemented (`HomeView.vue:46`) |
+| Home dashboard + Host Health + runtime panel | ✅ Implemented (`HomeView.vue:56`) |
 | Empty states for all views | ✅ Implemented |
-| Unit tests | ✅ Implemented (`pythonRuntimeCheck.test.ts`, `uvBootstrapper.test.ts`, `systemInfo.test.ts`, `dashboardStats.test.ts`, `HomeView.test.ts`) |
+| Unit tests | ✅ Implemented (`pythonRuntimeCheck.test.ts`, `uvBootstrapper.test.ts`, `dashboardStats.test.ts`, `HomeView.test.ts`) |
 
-**Conclusion:** The fresh-start workflow is fully implemented on the frontend: `App.vue` builds the context and performs a single cached uv runtime check while the Rust side guarantees the app data directory exists; the Home dashboard then renders zeroed stats, the system-version comparison, and a resolvable "uv is not installed" panel; every view shows a first-run empty state because missing JSON files read as empty lists. No dedicated Rust command was required — the flow composes the existing generic I/O, PATH-scan, registry, and download/extract commands.
+**Conclusion:** The fresh-start workflow is fully implemented on the frontend: `App.vue` builds the context and performs a single cached uv runtime check while the Rust side guarantees the app data directory exists; the Home dashboard then renders zeroed stats, the Host Health checks, and a resolvable "uv is not installed" panel; every view shows a first-run empty state because missing JSON files read as empty lists. No dedicated Rust command was required — the flow composes the existing generic I/O, PATH-scan, registry, and download/extract commands.
 
 **Optional future work (not required for correctness):**
 

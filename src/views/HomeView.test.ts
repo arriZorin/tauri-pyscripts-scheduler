@@ -59,10 +59,11 @@ const emptyOverrides = {
   taskRepository: { list: async () => [] } as never,
   taskRunRepository: { list: async () => [] } as never,
   hostHealth: { check: async (runtimeResult?: RequirementCheckResult | null): Promise<HostHealthResult> => {
-    const items: { label: string; ok: boolean; detail: string }[] = []
+    const items: { key: string; label: string; ok: boolean; detail: string }[] = []
     if (runtimeResult) {
       items.push({
-        label: 'Python Runtime',
+        key: 'python-runtime',
+        label: 'uv (Python manager)',
         ok: runtimeResult.status === 'met' || runtimeResult.status === 'notMet' || runtimeResult.status === 'deferred',
         detail: runtimeResult.status === 'met' ? runtimeResult.message : `Warning: ${runtimeResult.message}`,
       })
