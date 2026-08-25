@@ -48,11 +48,6 @@ fn get_log_directory(state: tauri::State<'_, AppDataDir>) -> Result<String, Stri
 }
 
 #[tauri::command]
-fn get_app_data_dir(state: tauri::State<'_, AppDataDir>) -> Result<String, String> {
-    Ok(state.0.to_string_lossy().to_string())
-}
-
-#[tauri::command]
 fn scan_files(folder: String) -> Result<Vec<String>, String> {
     let path = Path::new(&folder);
     let mut files: Vec<String> = Vec::new();
@@ -470,7 +465,6 @@ pub fn run() {
             list_scheduled_tasks,
             get_task_run_result,
             get_log_directory,
-            get_app_data_dir,
             get_app_mode,
             get_venv_python_path,
             ensure_script_venv,

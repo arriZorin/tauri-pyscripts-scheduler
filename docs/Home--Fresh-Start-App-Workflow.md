@@ -47,7 +47,7 @@ src/
 │   │   ├── versionRequirement.ts        ← version constraint parsing (unused at boot)
 │   │   └── types.ts                     ← RequirementCheckResult / RuntimeRequirement
 │   ├── home/
-│   │   ├── hostHealth.ts                ← host-env probes (COM/winget/writable/disk/python; winget only while uv unresolved)
+│   │   ├── hostHealth.ts                ← host-env probes (COM/winget/writable/python; winget only while uv unresolved)
 │   │   └── dashboardStats.ts            ← pure stats aggregation
 │   ├── script/JsonScriptRepository.ts   ← reads scripts.json (missing → [])
 │   ├── task/JsonTaskRepository.ts       ← reads tasks.json (missing → [])
@@ -315,7 +315,7 @@ onMounted(() => { loadStats(); });
 
 1. Parallel repository reads — each hits `read_text_file`; a missing file returns `null`, so each repository yields `[]`.
 2. `computeDashboardStats` (`dashboardStats.ts:39`) aggregates totals — all zeros on a fresh start. It tracks `usedScripts`/`unusedScripts` by cross-referencing task `scriptId` values against script `id` values: a `usedScriptIds` set (`dashboardStats.ts:44`) collects every `task.scriptId`, then `usedScripts = scripts.filter(s => usedScriptIds.has(s.id)).length` and `unusedScripts = scripts.length - usedScripts`.
-3. `hostHealth.check(runtimeResult.value)` (`hostHealth.ts:37`) probes host preconditions — Task Scheduler COM, winget on PATH (only while uv is unresolved), app-data-dir writability, disk free space (resolved via `get_app_data_dir` + `get_disk_free_space`), and the cached Python runtime (reported as "uv (Python manager)") — aggregated to an `All ok` / `Warnings` / `Failing` card (`HomeView.vue:205-233`). On a fresh machine every probe degrades gracefully (missing winget → zip-fallback note; disk query failure → "Could not query").
+3. `hostHealth.check(runtimeResult.value)` (`hostHealth.ts:39`) probes host preconditions — Task Scheduler COM, winget on PATH (only while uv is unresolved), app-data-dir writability, and the cached Python runtime (reported as "uv (Python manager)") — aggregated to an `All ok` / `Warnings` / `Failing` card (`HomeView.vue:205-233`). On a fresh machine every probe degrades gracefully (missing winget → zip-fallback note).
 4. Runtime panel renders the cached `runtimeCheckResult` — on a fresh machine: badge `Not met`, message "uv is not installed.", **Resolve** button (`HomeView.vue:226-231`).
 5. The first-run hint (`HomeView.vue:255-257`):
 

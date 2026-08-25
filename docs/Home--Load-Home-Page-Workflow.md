@@ -25,12 +25,11 @@ populates the dashboard, the Host Health card, and the Recent Executions table.
    winget only while uv is unresolved) over the three `Json*Repository` adapters.
 4. **Rust backend** supplies only generic commands already registered —
    `read_text_file` (JSON reads), `write_text_file` (writability probe),
-   `list_scheduled_tasks` (COM probe), `find_all_in_path_command` (winget scan),
-   `get_app_data_dir` + `get_disk_free_space` (disk probe).
+   `list_scheduled_tasks` (COM probe), `find_all_in_path_command` (winget scan).
 
 The entire Home load path is implemented on the frontend. Persistence re-uses
 `JsonScriptRepository`, `JsonTaskRepository`, and `JsonTaskRunRepository` over
-`TauriFileStorage`, and the Host Health card composes the generic COM/PATH/disk
+`TauriFileStorage`, and the Host Health card composes the generic COM/PATH
 commands — no dedicated load-home command is registered.
 
 ---
@@ -49,7 +48,7 @@ src/
 │   └── useNavigation.ts                 ← activeView default 'home'; setView()
 ├── services/
 │   ├── home/
-│   │   ├── hostHealth.ts                ← Step 4: host-env probes (COM/winget/writable/disk/python; winget only while uv unresolved)
+│   │   ├── hostHealth.ts                ← Step 4: host-env probes (COM/winget/writable/python; winget only while uv unresolved)
 │   │   └── dashboardStats.ts            ← Step 3: pure stats aggregation
 │   ├── script/JsonScriptRepository.ts   ← scripts.json adapter (list)
 │   ├── task/JsonTaskRepository.ts       ← tasks.json adapter (list)
@@ -82,17 +81,15 @@ src/
 src-tauri/
 └── src/
     ├── lib.rs                           ← registers generic I/O + Task Scheduler COM commands
-    └── systeminfo.rs                    ← run_process / PATH scan / disk free space
+    └── systeminfo.rs                    ← run_process / PATH scan
 ```
 
-**Relevant existing commands (already registered in `invoke_handler`, `src-tauri/src/lib.rs:453-485`):**
+**Relevant existing commands (already registered in `invoke_handler`, `src-tauri/src/lib.rs:453-484`):**
 
 - `read_text_file` — `TauriFileStorage.read()` for scripts.json, tasks.json, task-runs.json
 - `write_text_file` — `checkAppDataWritable` probe marker write/cleanup
-- `list_scheduled_tasks` — `checkTaskScheduler` COM probe (`hostHealth.ts:59`)
-- `find_all_in_path_command` — `checkWinget` PATH scan (`hostHealth.ts:76`)
-- `get_app_data_dir` — `checkDiskFreeSpace` drive source (`hostHealth.ts:147`)
-- `get_disk_free_space` — `checkDiskFreeSpace` (`hostHealth.ts:148`)
+- `list_scheduled_tasks` — `checkTaskScheduler` COM probe (`hostHealth.ts:65`)
+- `find_all_in_path_command` — `checkWinget` PATH scan (`hostHealth.ts:84`)
 
 No load-specific command exists; the page composes these generic commands.
 
@@ -253,7 +250,7 @@ The function is pure (no I/O) — that is what makes `dashboardStats.test.ts` un
 
 ### Step 4 — Host Health Checks
 
-**Location:** `src/services/home/hostHealth.ts:41-66`
+**Location:** `src/services/home/hostHealth.ts:39-61`
 
 ```ts
 export async function checkHostHealth(runtimeResult?: RequirementCheckResult | null): Promise<HostHealthResult> {
@@ -267,9 +264,7 @@ export async function checkHostHealth(runtimeResult?: RequirementCheckResult | n
   }
   // 3. App data dir writable
   await checkAppDataWritable(items)
-  // 4. Disk free space
-  await checkDiskFreeSpace(items)
-  // 5. Python runtime
+  // 4. Python runtime
   checkPythonRuntime(items, runtimeResult)
 
   const errors = items.filter(i => i.status === 'error').length
@@ -283,18 +278,17 @@ export async function checkHostHealth(runtimeResult?: RequirementCheckResult | n
 
 **Behaviour:**
 
-1. **Task Scheduler** (`:69-85`) — invokes `list_scheduled_tasks`; an error means the COM Schedule service is down/permission-blocked → `status: 'error'`.
-2. **Winget** (`:88-113`) — `find_all_in_path_command { name: 'winget' }` PATH scan, **only while uv is unresolved** (`checkHostHealth` gates it on `status !== 'met'`). This probe never warns or fails the card: "found", "not found" and "could not check" all keep `status: 'ok'` and only note how a future uv bootstrap would proceed (winget vs zip fallback). Once uv is met, the item is omitted entirely.
-3. **App Data Dir** (`:116-145`) — writes `_hermes_health_marker` via `write_text_file`, reads it back, then overwrites to clean up; failure → `status: 'error'` ("all persistence operations will fail").
-4. **Disk Space** (`:148-189`) — `get_app_data_dir` (Rust) resolves the app data dir, then `get_disk_free_space` queries the drive that holds it (where persistence + venvs live). `< 100 MB` → `status: 'error'`, `< 500 MB` → `status: 'warning'`, else `status: 'ok'` (`x.x GB free`). A query failure ("Could not query") is `status: 'warning'` — never a green check. This deliberately avoids `process.env` — it is **not** available in the Tauri webview, so the old code always fell back to "Could not query".
-5. **uv / Python manager** (`:192-227`) — reads the **cached** startup `runtimeResult`. The item is labelled "uv (Python manager)" because the app delegates Python to uv; when met the detail explains "uv found — Python resolves per-venv when tasks run" plus the resolved uv path, rather than reporting a raw binary path under a "Python Runtime" heading. `met` → `status: 'ok'`; `notMet`/`deferred` → `status: 'warning'` (recoverable in-app via Resolve); `failed` → `status: 'error'`. This is why `loadStats` passes `runtimeResult.value` in.
+1. **Task Scheduler** (`:64-81`) — invokes `list_scheduled_tasks`; an error means the COM Schedule service is down/permission-blocked → `status: 'error'`.
+2. **Winget** (`:83-108`) — `find_all_in_path_command { name: 'winget' }` PATH scan, **only while uv is unresolved** (`checkHostHealth` gates it on `status !== 'met'`). This probe never warns or fails the card: "found", "not found" and "could not check" all keep `status: 'ok'` and only note how a future uv bootstrap would proceed (winget vs zip fallback). Once uv is met, the item is omitted entirely.
+3. **App Data Dir** (`:111-140`) — writes `_hermes_health_marker` via `write_text_file`, reads it back, then overwrites to clean up; failure → `status: 'error'` ("all persistence operations will fail").
+4. **uv / Python manager** (`:143-178`) — reads the **cached** startup `runtimeResult`. The item is labelled "uv (Python manager)" because the app delegates Python to uv; when met the detail explains "uv found — Python resolves per-venv when tasks run" plus the resolved uv path, rather than reporting a raw binary path under a "Python Runtime" heading. `met` → `status: 'ok'`; `notMet`/`deferred` → `status: 'warning'` (recoverable in-app via Resolve); `failed` → `status: 'error'`. This is why `loadStats` passes `runtimeResult.value` in.
 
-Each item carries a stable `key` (`task-scheduler`, `winget`, `app-data-dir`, `disk-space`, `python-runtime`) that drives the `health-*` test ids (`HomeView.vue:218`), and a `status` that drives the per-item icon — green ✓ / amber ! / red ✗ — independent of the user-facing label.
+Each item carries a stable `key` (`task-scheduler`, `winget`, `app-data-dir`, `python-runtime`) that drives the `health-*` test ids (`HomeView.vue:218`), and a `status` that drives the per-item icon — green ✓ / amber ! / red ✗ — independent of the user-facing label.
 
 The card aggregates into one status badge — `All ok` / `Warnings` / `Failing` — from the item `status` values (any `error` → `failing`, else any `warning` → `warning`, else `ok`) and lists each probe with its three-state icon (`HomeView.vue:205-233`).
 
 **Flow chain:**
-`hostHealth.check(runtimeResult)` → probes over the generic commands (COM-backed `list_scheduled_tasks`; PATH-scan `find_all_in_path_command` when uv unresolved; writability `write_text_file`/`read_text_file`; `get_app_data_dir` + `get_disk_free_space`; cached runtime result) → `{ items, status }` → `hostHealthResult` ref → Host Health card
+`hostHealth.check(runtimeResult)` → probes over the generic commands (COM-backed `list_scheduled_tasks`; PATH-scan `find_all_in_path_command` when uv unresolved; writability `write_text_file`/`read_text_file`; cached runtime result) → `{ items, status }` → `hostHealthResult` ref → Host Health card
 
 ---
 
@@ -353,7 +347,7 @@ async list(): Promise<TaskRun[]> {
 
 1. Each repository reads through `FileStorage.read()` → `invoke('read_text_file')`.
 2. `null` content (JSON file not created yet, `read_text_file` returns `Ok(None)` on NotFound) → `[]`. This powers the Home empty states — zeroed stats, "No executions yet.", and the first-run hint — with **no dedicated bootstrap path**.
-3. The Host Health probes map to the generic commands verified in `invoke_handler` (`src-tauri/src/lib.rs:458-491`): `read_text_file`, `write_text_file`, `list_scheduled_tasks` (`:470`), `find_all_in_path_command` (`:484`), `get_app_data_dir` (`:473`), `get_disk_free_space` (`:490`). No Home-load command exists.
+3. The Host Health probes map to the generic commands verified in `invoke_handler` (`src-tauri/src/lib.rs:458-490`): `read_text_file`, `write_text_file`, `list_scheduled_tasks` (`:470`), `find_all_in_path_command` (`:484`). No Home-load command exists.
 
 ```
 HomeView (onMounted)
@@ -365,7 +359,6 @@ HomeView (onMounted)
           ├─ list_scheduled_tasks        (COM probe)
           ├─ find_all_in_path_command    (winget scan)
           ├─ write_text_file / read_text_file (writability marker)
-          ├─ get_app_data_dir → get_disk_free_space (disk probe)
           └─ cached runtimeCheckResult   (Python probe)
 ```
 
@@ -387,8 +380,7 @@ HomeView (onMounted)
 
 **Conclusion:** The "Load Home page" workflow is complete on the frontend. The
 page composes the existing generic commands — `read_text_file`, `write_text_file`,
-`list_scheduled_tasks`, `find_all_in_path_command`, `get_app_data_dir`,
-`get_disk_free_space` —
+`list_scheduled_tasks`, `find_all_in_path_command` —
 through the three JSON repositories and the `hostHealth`/`dashboardStats`
 services, so no dedicated Rust command is required. All loads are defensive
 (empty list / `null` on failure) and the JSON-absent → `[]` semantics power the
@@ -397,8 +389,8 @@ first-run empty states.
 **Optional future work (not required for correctness):**
 
 - The Host Health check runs on every Home mount (one `list_scheduled_tasks`
-  COM probe plus up to five invoke round-trips — winget scan only while uv is
-  unresolved; marker write/read; `get_app_data_dir` + `get_disk_free_space`).
+  COM probe plus up to three invoke round-trips — winget scan only while uv is
+  unresolved; marker write/read).
   It could be cached like the runtime check, or refreshed on a timer, if the
   probe cost ever matters.
 - `loadStats` awaits all four sources before painting real data; the stat cards

@@ -31,8 +31,6 @@ export interface HostHealthService {
  *   has no effect on the app.
  * - **App data writable** — writes a temporary marker to the app data dir
  *   and deletes it.
- * - **Disk free space** — queries free bytes on the app-data drive.
- *   Warning if < 500 MB, error if < 100 MB.
  * - **Python runtime (uv)** — reads the cached startup check result. The app
  *   delegates Python to uv, so this reports on the uv manager, not a Python
  *   interpreter. `notMet`/`deferred` are warnings (fixable in-app via
@@ -52,10 +50,7 @@ export async function checkHostHealth(runtimeResult?: RequirementCheckResult | n
   // 3. App data dir writable
   await checkAppDataWritable(items)
 
-  // 4. Disk free space
-  await checkDiskFreeSpace(items)
-
-  // 5. Python runtime
+  // 4. Python runtime
   checkPythonRuntime(items, runtimeResult)
 
   const errors = items.filter(i => i.status === 'error').length
@@ -141,50 +136,6 @@ async function checkAppDataWritable(items: HostHealthItem[]): Promise<void> {
       label: 'App Data Dir',
       status: 'error',
       detail: 'Not writable — all persistence operations will fail',
-    })
-  }
-}
-
-async function checkDiskFreeSpace(items: HostHealthItem[]): Promise<void> {
-  try {
-    // Query free space on the drive that holds the app data dir — that is the
-    // disk that actually matters (JSON persistence + venvs live there).
-    // Note: `process.env` is NOT available in the Tauri webview, so the drive
-    // must come from Rust (get_app_data_dir), never from the Node process.
-    const appDataDir = await invoke<string>('get_app_data_dir')
-    const drive = appDataDir.substring(0, 2) // e.g. "C:"
-    const freeBytes = await invoke<number>('get_disk_free_space', { path: drive + '\\' })
-    const freeMb = Math.round(freeBytes / (1024 * 1024))
-
-    if (freeMb < 100) {
-      items.push({
-        key: 'disk-space',
-        label: 'Disk Space',
-        status: 'error',
-        detail: `${freeMb} MB free — critical, below 100 MB`,
-      })
-    } else if (freeMb < 500) {
-      items.push({
-        key: 'disk-space',
-        label: 'Disk Space',
-        status: 'warning',
-        detail: `Warning: only ${freeMb} MB free — below 500 MB`,
-      })
-    } else {
-      const gb = (freeMb / 1024).toFixed(1)
-      items.push({
-        key: 'disk-space',
-        label: 'Disk Space',
-        status: 'ok',
-        detail: `${gb} GB free`,
-      })
-    }
-  } catch {
-    items.push({
-      key: 'disk-space',
-      label: 'Disk Space',
-      status: 'warning',
-      detail: 'Could not query',
     })
   }
 }
