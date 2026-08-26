@@ -88,7 +88,7 @@ src-tauri/
     └── lib.rs                           ← registers generic I/O + Task Scheduler COM commands
 ```
 
-**Relevant existing commands (already registered in `invoke_handler`, `src-tauri/src/lib.rs:429-459`):**
+**Relevant existing commands (already registered in `invoke_handler`, `src-tauri/src/lib.rs:508-541`):**
 
 - `read_text_file` — `TauriFileStorage.read()` for tasks.json, task-runs.json, and per-task stdout/stderr logs
 - `write_text_file` — `TauriFileStorage.write()` (used by other flows; load is read-only)

@@ -2,7 +2,7 @@
 
 **Project:** `tauri-pyscripts-scheduler`
 **Date:** 2026-08-22
-**Status:** ✅ Implemented — dedicated Rust command `delete_scheduled_task` (registered in `invoke_handler` at `src-tauri/src/lib.rs:437`)
+**Status:** ✅ Implemented — dedicated Rust command `delete_scheduled_task` (registered in `invoke_handler` at `src-tauri/src/lib.rs:508`)
 
 ---
 
@@ -230,7 +230,7 @@ export function taskWindowsName(id: string): string {
 
 ### Step 4 — Rust Backend (COM DeleteTask)
 
-**Location:** `src-tauri/src/lib.rs:261-269` (command), `:437` (registered in `generate_handler![...]`)
+**Location:** `src-tauri/src/lib.rs:316-324` (command), `:508` (registered in `generate_handler![...]`)
 
 ```rust
 #[tauri::command]
@@ -244,7 +244,7 @@ fn delete_scheduled_task(task_name: String) -> Result<String, String> {
 }
 ```
 
-Delegates to the COM implementation in `src-tauri/src/windows_scheduler.rs:781`:
+Delegates to the COM implementation in `src-tauri/src/windows_scheduler.rs:887`:
 
 ```rust
 /// Deletes a scheduled task. A missing task is reported as an error (the
@@ -331,7 +331,7 @@ Delete click → requestDelete → modal confirm → confirmDelete
 
 **Conclusion:** The Delete workflow is complete across all four layers — Vue
 modal flow → JSON repository → TS scheduler adapter → dedicated Rust COM
-command (`delete_scheduled_task` registered at `src-tauri/src/lib.rs:437`).
+command (`delete_scheduled_task` registered at `src-tauri/src/lib.rs:508`).
 The frontend deliberately treats COM-delete failure as success, so the
 reconcile banner (Clean Orphans) is the safety net for a registration that
 survives deletion, and run history is intentionally left untouched.

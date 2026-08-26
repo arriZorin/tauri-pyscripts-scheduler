@@ -73,17 +73,17 @@ src-tauri/
     └── lib.rs                           ← registers generic I/O + scan + venv commands
 ```
 
-**Relevant existing commands (already registered in `invoke_handler`, `src-tauri/src/lib.rs:430`):**
+**Relevant existing commands (already registered in `invoke_handler`, `src-tauri/src/lib.rs:508`):**
 
 - `scan_files` — used by the **Add Folder** path
 - `read_text_file` / `write_text_file` — used by `TauriFileStorage` for scripts.json
 - `read_folder_requirements` / `scan_script_deps` — used by the post-add dependency auto-scan
-- `write_requirements_txt` — used by `confirmDeps` to create requirements.txt (`lib.rs:406`)
+- `write_requirements_txt` — used by `confirmDeps` to create requirements.txt (`lib.rs:461`)
 - `ensure_script_venv` — used by `confirmDeps` to create the venv (uv)
 - `sync_script_deps` — used by `confirmDeps` to install deps from requirements.txt
-- `path_exists` — used to detect `pyproject.toml` in the script folder (`lib.rs:434`)
+- `path_exists` — used to detect `pyproject.toml` in the script folder (`lib.rs:153`)
 - Dialog plugin (`tauri_plugin_dialog`) — used by the file/folder picker
-- `uv_sync_project` — runs `uv sync` in the script folder for pyproject.toml-based projects (`lib.rs:422`)
+- `uv_sync_project` — runs `uv sync` in the script folder for pyproject.toml-based projects (`lib.rs:480`)
 
 ---
 

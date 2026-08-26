@@ -93,7 +93,7 @@ agreement:
 
 1. Scan `src/services/**/*.ts` for every `invoke('command', …)` string.
 2. Parse the command names out of `tauri::generate_handler![...]` in
-   `src-tauri/src/lib.rs:429` (a small regex over the file text).
+   `src-tauri/src/lib.rs:508` (a small regex over the file text).
 3. Assert: every TS-invoked command is registered in the handler; optionally every
    registered command is used somewhere.
 
@@ -166,8 +166,8 @@ This is where the app's real risk lives (venv + COM), and the Rust layer is the
 thinnest, most stable part — so these tests are cheap to write and rarely flaky.
 
 **Caveat:** Level 3 does not cross the IPC bridge — it calls the Rust functions
-directly. The `delete_scheduled_task` command at `lib.rs:262` is a thin wrapper over
-`windows_scheduler::delete_task` (`windows_scheduler.rs:781`), so testing the
+directly. The `delete_scheduled_task` command at `lib.rs:317` is a thin wrapper over
+`windows_scheduler::delete_task` (`windows_scheduler.rs:887`), so testing the
 function covers ~all of the command's logic.
 
 ---

@@ -84,7 +84,7 @@ src-tauri/
     └── systeminfo.rs                    ← run_process / PATH scan
 ```
 
-**Relevant existing commands (already registered in `invoke_handler`, `src-tauri/src/lib.rs:453-484`):**
+**Relevant existing commands (already registered in `invoke_handler`, `src-tauri/src/lib.rs:508-541`):**
 
 - `read_text_file` — `TauriFileStorage.read()` for scripts.json, tasks.json, task-runs.json
 - `write_text_file` — `checkAppDataWritable` probe marker write/cleanup
@@ -347,7 +347,7 @@ async list(): Promise<TaskRun[]> {
 
 1. Each repository reads through `FileStorage.read()` → `invoke('read_text_file')`.
 2. `null` content (JSON file not created yet, `read_text_file` returns `Ok(None)` on NotFound) → `[]`. This powers the Home empty states — zeroed stats, "No executions yet.", and the first-run hint — with **no dedicated bootstrap path**.
-3. The Host Health probes map to the generic commands verified in `invoke_handler` (`src-tauri/src/lib.rs:458-490`): `read_text_file`, `write_text_file`, `list_scheduled_tasks` (`:470`), `find_all_in_path_command` (`:484`). No Home-load command exists.
+3. The Host Health probes map to the generic commands verified in `invoke_handler` (`src-tauri/src/lib.rs:508-541`): `read_text_file`, `write_text_file`, `list_scheduled_tasks` (`:521`), `find_all_in_path_command` (`:534`). No Home-load command exists.
 
 ```
 HomeView (onMounted)

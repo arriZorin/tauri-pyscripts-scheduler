@@ -65,9 +65,9 @@ src-tauri/
     └── windows_scheduler.rs                ← run_task() COM implementation
 ```
 
-**Relevant existing commands (already registered in `invoke_handler`, `src-tauri/src/lib.rs:453`):**
+**Relevant existing commands (already registered in `invoke_handler`, `src-tauri/src/lib.rs:508-541`):**
 
-- `run_scheduled_task` — generic COM task trigger used by both Run Now and scheduled execution (`lib.rs:318`)
+- `run_scheduled_task` — generic COM task trigger used by both Run Now and scheduled execution (`lib.rs:337`)
 - `get_scheduled_task_status` — used by `TaskRunRecorder.finalizePending` to check if still running
 - `get_task_run_result` — used by `TaskRunRecorder.finalizePending` to obtain last result + log paths
 - `read_text_file` / `write_text_file` — used by `TauriFileStorage` for `task-runs.json`
@@ -290,7 +290,7 @@ TaskRunRecorder
 
 ### Step 5 — Rust: `run_scheduled_task` (COM)
 
-**Location:** `src-tauri/src/lib.rs:318` (registered in `invoke_handler` at line 500)
+**Location:** `src-tauri/src/lib.rs:337` (registered in `invoke_handler` at line 508)
 
 ```rust
 #[tauri::command]
@@ -302,7 +302,7 @@ fn run_scheduled_task(task_name: String) -> Result<String, String> {
 }
 ```
 
-**Implementation:** `src-tauri/src/windows_scheduler.rs:798`
+**Implementation:** `src-tauri/src/windows_scheduler.rs:904`
 
 ```rust
 pub fn run_task(task_name: &str) -> Result<String, String> {

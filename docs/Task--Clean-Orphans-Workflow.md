@@ -59,9 +59,9 @@ src-tauri/
     └── windows_scheduler.rs             ← COM Task Scheduler delete
 ```
 
-**Relevant command (registered in `invoke_handler`, `src-tauri/src/lib.rs:429`):**
+**Relevant command (registered in `invoke_handler`, `src-tauri/src/lib.rs:508`):**
 
-- `delete_scheduled_task` — deletes a registered task by name (`lib.rs:262`); deleting a never-registered name is success semantics (`TaskScheduler.ts:49-53`)
+- `delete_scheduled_task` — deletes a registered task by name (`lib.rs:317`); deleting a never-registered name is success semantics (`TaskScheduler.ts:49-53`)
 
 ---
 
@@ -204,7 +204,7 @@ async delete(taskId: string): Promise<void> {
 
 ### Step 5 — Rust delete_scheduled_task (COM)
 
-**Location:** `src-tauri/src/lib.rs:262` (registered in `invoke_handler` at line 429)
+**Location:** `src-tauri/src/lib.rs:317` (registered in `invoke_handler` at line 508)
 
 ```rust
 #[tauri::command]
@@ -230,7 +230,7 @@ fn delete_scheduled_task(task_name: String) -> Result<String, String> {
 | Orphan detection (`reconcileTasks`) | ✅ Implemented (`TaskReconciler.ts:19`) |
 | Orphan deletion (`removeOrphanedRegistrations`) | ✅ Implemented (`TaskReconciler.ts:68`) |
 | Scheduler delete adapter | ✅ Implemented (`TaskScheduler.ts:48`) |
-| Rust `delete_scheduled_task` | ✅ Implemented (`lib.rs:262`) |
+| Rust `delete_scheduled_task` | ✅ Implemented (`lib.rs:317`) |
 | Success/error feedback alerts | ✅ Implemented (`TaskView.vue:127-129`) |
 | Unit tests | ✅ Implemented (`TaskReconciler.test.ts`, `TaskView.test.ts`) |
 

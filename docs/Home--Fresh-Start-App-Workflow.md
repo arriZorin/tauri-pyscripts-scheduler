@@ -83,7 +83,7 @@ src-tauri/
     └── systeminfo.rs                    ← run_process / PATH scan / registry / download / extract
 ```
 
-**Relevant commands (registered in `invoke_handler`, `src-tauri/src/lib.rs:429`):**
+**Relevant commands (registered in `invoke_handler`, `src-tauri/src/lib.rs:508`):**
 
 - `path_exists` — used by `fileExists` (`environmentQuery.ts:33`)
 - `find_all_in_path_command` — PATH scan for `uv.exe` (`systeminfo.rs:219`)
@@ -142,7 +142,7 @@ The sidebar (`navItems`, `useNavigation.ts:11-17`) renders **Home / Scripts List
 
 ### Step 1b — Rust Setup (app data dir)
 
-**Location:** `src-tauri/src/lib.rs:460-465`
+**Location:** `src-tauri/src/lib.rs:542-547`
 
 ```rust
 .setup(|app| {
@@ -347,7 +347,7 @@ Each view's `onMounted` loads its own data (ScriptsListView `loadAndReconcile` a
 |--------|--------|
 | Vue bootstrap (`main.ts`) | ✅ Implemented |
 | DI context + shell (App.vue) | ✅ Implemented |
-| App data dir creation (Rust setup) | ✅ Implemented (`lib.rs:460`) |
+| App data dir creation (Rust setup) | ✅ Implemented (`lib.rs:542`) |
 | Startup log entry (`app startup`) | ✅ Implemented (`App.vue:62`) |
 | One-shot cached runtime check | ✅ Implemented (`pythonRuntimeCheck.ts:25`) |
 | uv locate (managed dir → PATH) | ✅ Implemented (`pythonRuntimeCheck.ts:75`) |

@@ -67,11 +67,11 @@ src-tauri/
     └── lib.rs                           ← registers generic I/O + scheduling + venv commands
 ```
 
-**Relevant existing commands (already registered in `invoke_handler`, `src-tauri/src/lib.rs:453`):**
+**Relevant existing commands (already registered in `invoke_handler`, `src-tauri/src/lib.rs:508`):**
 
 - `read_text_file` / `write_text_file` — used by `TauriFileStorage` for scripts.json / tasks.json
 - `delete_scheduled_task` — used by `TauriTaskScheduler.delete` for COM task removal
-- `delete_script_venv` — used by `TauriVenvSync.cleanupFolder` for venv removal (`src-tauri/src/lib.rs:374`)
+- `delete_script_venv` — used by `TauriVenvSync.cleanupFolder` for venv removal (`src-tauri/src/lib.rs:430`)
 - `path_exists` — used by `scriptPathChecker` during reload
 
 ---
@@ -343,7 +343,7 @@ async cleanupFolder(scriptPath: string): Promise<void> {
 - List all scripts and check if any remain in the same folder.
 - **No scripts remain**:
   - Check if the folder itself exists via `path_exists`. If the folder is gone (e.g. the user deleted the root directory), the venv is already gone — return early as a no-op success.
-  - Otherwise, invoke `delete_script_venv` (Rust command at `src-tauri/src/lib.rs:374`) to remove the `.venv` directory.
+  - Otherwise, invoke `delete_script_venv` (Rust command at `src-tauri/src/lib.rs:430`) to remove the `.venv` directory.
 - **Scripts remain** → re-read `requirements.txt` and re-sync deps for the remaining scripts (no venv deletion).
 
 ---

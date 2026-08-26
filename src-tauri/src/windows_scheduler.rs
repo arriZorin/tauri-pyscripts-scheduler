@@ -7,6 +7,7 @@
 
 use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
+use std::path::{Path, PathBuf};
 use std::ptr;
 
 use winapi::ctypes::c_void;
@@ -42,6 +43,11 @@ fn wide(value: &str) -> Vec<u16> {
 pub struct CreateTaskSpec {
     pub task_name: String,
     pub venv_python_path: String,
+    /// Absolute path of the embedded `run_script.py` launcher (written into
+    /// the app data directory). The task's exec action runs this file with
+    /// the venv interpreter directly — no cmd.exe — and it redirects
+    /// stdout/stderr into the per-task logs before spawning the real script.
+    pub launcher_path: String,
     pub script_path: String,
     pub arguments: Vec<String>,
     pub working_directory: String,
@@ -88,21 +94,26 @@ fn validate_absolute_path(value: &str, label: &str) -> Result<(), String> {
 }
 
 /// Builds the exec action (program path, arguments) that runs the script
-/// through `cmd.exe /c` and redirects stdout/stderr into per-task log files
-/// inside the log directory. Pure so it is unit-testable without COM.
+/// directly with the venv interpreter through a small Python launcher that
+/// redirects stdout/stderr into per-task log files inside the log directory.
+/// Pure so it is unit-testable without COM.
 ///
-/// The arguments follow the `cmd /c ""...""` quoting convention: the whole
-/// command is wrapped in one pair of quotes, and each path/argument is
-/// individually quoted. Because `validate_text` rejects shell metacharacters
-/// in all inputs, the embedded values cannot break out of the wrapper.
+/// No shell is involved: the program is `venv_python_path` itself and the
+/// arguments point at the launcher, which spawns the real script with
+/// `subprocess` and copies its exit code through. Script arguments are
+/// separated from the launcher flags by `--`, so they can never collide
+/// with the flags. Because `validate_text` rejects shell metacharacters and
+/// the child is spawned without a shell, there is no quoting to escape.
 pub fn exec_action_parts(
     venv_python_path: &str,
+    launcher_path: &str,
     script_path: &str,
     arguments: &[String],
     log_directory: &str,
     task_name: &str,
 ) -> Result<(String, String), String> {
     validate_absolute_path(venv_python_path, "venv_python_path")?;
+    validate_absolute_path(launcher_path, "launcher_path")?;
     validate_absolute_path(script_path, "script_path")?;
     validate_absolute_path(log_directory, "log_directory")?;
     for argument in arguments {
@@ -112,16 +123,107 @@ pub fn exec_action_parts(
     let stdout_log = format!("{}\\{}.out.log", log_directory, stem);
     let stderr_log = format!("{}\\{}.err.log", log_directory, stem);
 
-    let mut command = format!("\"{}\" \"{}\"", venv_python_path, script_path);
-    for argument in arguments {
-        command.push_str(&format!(" \"{}\"", argument));
+    let mut command = format!(
+        "\"{}\" --script \"{}\" --stdout-log \"{}\" --stderr-log \"{}\"",
+        launcher_path, script_path, stdout_log, stderr_log
+    );
+    if !arguments.is_empty() {
+        command.push_str(" --");
+        for argument in arguments {
+            command.push_str(&format!(" \"{}\"", argument));
+        }
     }
-    command.push_str(&format!(" 1> \"{}\" 2> \"{}\"", stdout_log, stderr_log));
 
-    Ok((
-        "C:\\Windows\\System32\\cmd.exe".to_string(),
-        format!("/c \"{}\"", command),
-    ))
+    Ok((venv_python_path.to_string(), command))
+}
+
+/// Embedded source of the launcher script each scheduled task runs. The
+/// task's exec action invokes it with the venv interpreter directly (no
+/// cmd.exe); the launcher redirects stdout/stderr into the per-task log
+/// files, then spawns the real script as a child and propagates its exit
+/// code so the Task Scheduler records the real LastResult. Stdlib-only so
+/// the venv needs no extra packages.
+pub const RUN_SCRIPT_LAUNCHER: &str = r#"#!/usr/bin/env python3
+"""Run a script with stdout/stderr redirected into per-task log files.
+
+Invoked by Windows Task Scheduler as:
+
+    <venv-python> run_script.py --script <path> --stdout-log <out> --stderr-log <err> -- <script args...>
+
+The launcher spawns the real script with the same interpreter
+(sys.executable), redirects its stdout/stderr into the given log files
+(truncating them, matching the old cmd `1>`/`2>` behavior), waits for it,
+and exits with its exit code. Stdlib only; no shell is involved, so there
+is no quoting to escape.
+"""
+
+import os
+import subprocess
+import sys
+
+
+def _opt(argv, flag):
+    if flag not in argv:
+        sys.stderr.write("run_script.py: missing {0}\n".format(flag))
+        sys.exit(2)
+    index = argv.index(flag)
+    if index + 1 >= len(argv):
+        sys.stderr.write("run_script.py: {0} requires a value\n".format(flag))
+        sys.exit(2)
+    return argv[index + 1]
+
+
+def main():
+    argv = sys.argv[1:]
+    try:
+        separator = argv.index("--")
+        options = argv[:separator]
+        script_args = argv[separator + 1:]
+    except ValueError:
+        options = argv
+        script_args = []
+
+    script = _opt(options, "--script")
+    stdout_log = _opt(options, "--stdout-log")
+    stderr_log = _opt(options, "--stderr-log")
+
+    exit_code = 1
+    try:
+        for log_path in (stdout_log, stderr_log):
+            parent = os.path.dirname(log_path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+        with open(stdout_log, "wb") as stdout_file, open(stderr_log, "wb") as stderr_file:
+            child = subprocess.Popen(
+                [sys.executable, script] + script_args,
+                stdout=stdout_file,
+                stderr=stderr_file,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+            exit_code = child.wait()
+    except BaseException as error:  # noqa: BLE001 - surface any failure to the log
+        message = "run_script.py: {0}\n".format(error).encode("utf-8", "replace")
+        try:
+            with open(stderr_log, "ab") as stderr_file:
+                stderr_file.write(message)
+        except OSError:
+            pass
+        exit_code = 1
+    sys.exit(exit_code)
+
+
+if __name__ == "__main__":
+    main()
+"#;
+
+/// Ensures the launcher script exists at `<app_data>\run_script.py`,
+/// (re)writing the embedded source so it stays in sync with the binary.
+/// Returns the absolute path to pass into the task exec action.
+pub fn ensure_launcher(app_data: &Path) -> Result<PathBuf, String> {
+    let path = app_data.join("run_script.py");
+    std::fs::write(&path, RUN_SCRIPT_LAUNCHER)
+        .map_err(|e| format!("failed to write launcher script: {}", e))?;
+    Ok(path)
 }
 
 fn validate_text(value: &str, label: &str) -> Result<(), String> {
@@ -612,15 +714,18 @@ unsafe fn set_trigger_specifics(trigger: *mut ITrigger, plan: &TriggerPlan) -> R
 pub fn create_task(spec: &CreateTaskSpec) -> Result<String, String> {
     validate_text(&spec.task_name, "task_name")?;
     validate_text(&spec.venv_python_path, "venv_python_path")?;
+    validate_text(&spec.launcher_path, "launcher_path")?;
     validate_text(&spec.script_path, "script_path")?;
     validate_text(&spec.working_directory, "working_directory")?;
     for argument in &spec.arguments {
         validate_text(argument, "argument")?;
     }
-    // Build the cmd.exe action up front (pure): stdout/stderr are redirected
-    // into per-task log files inside the log directory.
+    // Build the python.exe + launcher action up front (pure): stdout/stderr
+    // are redirected into per-task log files by the launcher script inside
+    // the log directory.
     let (action_path, action_arguments) = exec_action_parts(
         &spec.venv_python_path,
+        &spec.launcher_path,
         &spec.script_path,
         &spec.arguments,
         &spec.log_directory,
@@ -693,7 +798,8 @@ pub fn create_task(spec: &CreateTaskSpec) -> Result<String, String> {
     let trigger = unsafe { build_trigger(task, &spec.schedule) }?;
     unsafe { (*trigger).Release() };
 
-    // Action: run the interpreter through cmd.exe (parts built above).
+    // Action: run the venv interpreter through the launcher script (parts
+    // built above).
     let mut actions: *mut IActionCollection = ptr::null_mut();
     let hr = unsafe { (*task).get_Actions(&mut actions) };
     if hr < 0 {
@@ -1042,36 +1148,86 @@ mod tests {
     }
 
     #[test]
-    fn exec_action_parts_redirects_stdout_and_stderr_into_log_dir() {
+    fn exec_action_parts_runs_python_directly_through_launcher() {
         let (path, args) = exec_action_parts(
             "C:\\Python312\\python.exe",
+            "C:\\AppData\\run_script.py",
             "C:\\Scripts\\backup.py",
             &["--output".to_string(), "C:\\Backup Folder".to_string()],
             "C:\\AppData\\logs",
             "PyscriptScheduler\\task-1",
         )
         .unwrap();
-        assert_eq!(path.to_lowercase(), "c:\\windows\\system32\\cmd.exe");
-        assert!(args.contains("C:\\Python312\\python.exe"));
+        // Program is the venv interpreter itself — no cmd.exe, no shell.
+        assert_eq!(path, "C:\\Python312\\python.exe");
+        assert!(args.contains("C:\\AppData\\run_script.py"));
+        assert!(args.contains("--script"));
         assert!(args.contains("C:\\Scripts\\backup.py"));
-        assert!(args.contains("C:\\Backup Folder"));
-        assert!(args.contains("1>"));
-        assert!(args.contains("2>"));
+        assert!(args.contains("--stdout-log"));
         assert!(args.contains("C:\\AppData\\logs\\PyscriptScheduler-task-1.out.log"));
+        assert!(args.contains("--stderr-log"));
         assert!(args.contains("C:\\AppData\\logs\\PyscriptScheduler-task-1.err.log"));
-        assert!(args.starts_with("/c \"\""));
+        // Script arguments are separated from launcher flags by `--` so they
+        // can never be misread as launcher options.
+        assert!(args.contains(" -- "));
+        assert!(args.contains("C:\\Backup Folder"));
+        assert!(!args.contains("cmd.exe"));
+    }
+
+    #[test]
+    fn exec_action_parts_omits_separator_when_no_script_arguments() {
+        let (_, args) = exec_action_parts(
+            "C:\\Python312\\python.exe",
+            "C:\\AppData\\run_script.py",
+            "C:\\Scripts\\backup.py",
+            &[],
+            "C:\\AppData\\logs",
+            "PyscriptScheduler\\task-1",
+        )
+        .unwrap();
+        assert!(!args.contains(" -- "));
+        assert!(!args.contains("--script-args"));
     }
 
     #[test]
     fn exec_action_parts_rejects_unsafe_arguments() {
         let result = exec_action_parts(
             "C:\\Python312\\python.exe",
+            "C:\\AppData\\run_script.py",
             "C:\\Scripts\\backup.py",
             &["--output".to_string(), "a&b".to_string()],
             "C:\\AppData\\logs",
             "PyscriptScheduler\\task-1",
         );
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn exec_action_parts_rejects_non_absolute_launcher_path() {
+        let result = exec_action_parts(
+            "C:\\Python312\\python.exe",
+            "run_script.py",
+            "C:\\Scripts\\backup.py",
+            &[],
+            "C:\\AppData\\logs",
+            "PyscriptScheduler\\task-1",
+        );
+        assert!(result.unwrap_err().contains("absolute"));
+    }
+
+    #[test]
+    fn ensure_launcher_writes_embedded_source_and_is_idempotent() {
+        let dir = std::env::temp_dir().join("p8-launcher-probe");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = ensure_launcher(&dir).unwrap();
+        assert_eq!(path, dir.join("run_script.py"));
+        let source = std::fs::read_to_string(&path).unwrap();
+        assert!(source.contains("run_script.py: missing"));
+        assert!(source.contains("CREATE_NO_WINDOW"));
+        // Re-running overwrites in place (idempotent, keeps in sync).
+        let again = ensure_launcher(&dir).unwrap();
+        assert_eq!(again, path);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -1242,6 +1398,7 @@ mod tests {
         let spec = CreateTaskSpec {
             task_name: "PyscriptScheduler\\task-1".to_string(),
             venv_python_path: "C:\\Python312\\python.exe".to_string(),
+            launcher_path: "C:\\AppData\\run_script.py".to_string(),
             script_path: "C:\\Scripts\\backup.py".to_string(),
             arguments: vec!["--output".to_string(), "C:\\Backup Folder".to_string()],
             working_directory: "C:\\Scripts".to_string(),
@@ -1253,6 +1410,7 @@ mod tests {
         // Validate without touching COM: each field individually.
         validate_text(&spec.task_name, "task_name").unwrap();
         validate_text(&spec.venv_python_path, "venv_python_path").unwrap();
+        validate_text(&spec.launcher_path, "launcher_path").unwrap();
         validate_text(&spec.script_path, "script_path").unwrap();
         validate_text(&spec.working_directory, "working_directory").unwrap();
         for argument in &spec.arguments {
@@ -1310,6 +1468,7 @@ mod tests {
         let spec = CreateTaskSpec {
             task_name: task_name.to_string(),
             venv_python_path: "C:\\Windows\\System32\\cmd.exe".to_string(),
+            launcher_path: "C:\\AppData\\run_script.py".to_string(),
             script_path: "C:\\Windows\\System32\\cmd.exe".to_string(),
             arguments: vec![],
             working_directory: "C:\\Windows\\System32".to_string(),
@@ -1345,6 +1504,10 @@ mod tests {
         std::fs::create_dir_all(&log_dir).unwrap();
         let _ = delete_task(task_name); // clean any previous probe
 
+        // The launcher script the exec action points at (production writes it
+        // into the app data dir; the test writes it beside the logs).
+        let launcher = ensure_launcher(&log_dir).unwrap();
+
         // A real python interpreter + a tiny script, mirroring production.
         let entries: Vec<String> = std::env::var("PATH")
             .unwrap_or_default()
@@ -1361,6 +1524,7 @@ mod tests {
         let spec = CreateTaskSpec {
             task_name: task_name.to_string(),
             venv_python_path: python,
+            launcher_path: launcher.to_string_lossy().to_string(),
             script_path: script.to_string_lossy().to_string(),
             arguments: vec![],
             working_directory: log_dir.to_string_lossy().to_string(),
@@ -1391,8 +1555,8 @@ mod tests {
         let mut content = String::new();
         while std::time::Instant::now() < deadline {
             if let Ok(text) = std::fs::read_to_string(&stdout_log) {
-                // cmd creates the redirect file empty before python writes,
-                // so keep polling until the marker actually appears.
+                // The launcher opens (creates empty) the redirect file before
+                // spawning python, so keep polling until the marker appears.
                 if text.contains("battery-probe-marker") {
                     content = text;
                     break;

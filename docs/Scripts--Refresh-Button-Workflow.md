@@ -68,7 +68,7 @@ src-tauri/
     └── lib.rs                           ← registers generic I/O + existence commands
 ```
 
-**Relevant existing commands (already registered in `invoke_handler`, `src-tauri/src/lib.rs:429-459`):**
+**Relevant existing commands (already registered in `invoke_handler`, `src-tauri/src/lib.rs:508-541`):**
 
 - `read_text_file` — used by `TauriFileStorage.read()` for scripts.json
 - `write_text_file` — used by `TauriFileStorage.write()` (other flows; refresh is read-only)
@@ -211,7 +211,7 @@ export const tauriScriptPathChecker: ScriptPathChecker = {
 
 **Behaviour:**
 
-1. `TauriFileStorage` is a TS adapter over the generic Rust commands `read_text_file` / `write_text_file` (registered in `invoke_handler` at `src-tauri/src/lib.rs:429-459`).
+1. `TauriFileStorage` is a TS adapter over the generic Rust commands `read_text_file` / `write_text_file` (registered in `invoke_handler` at `src-tauri/src/lib.rs:508-541`).
 2. `scriptPathChecker.exists()` maps to `path_exists` — the same command used by the task page for path validation.
 3. No refresh-specific Rust code exists; the flow composes these generic commands.
 

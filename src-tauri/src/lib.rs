@@ -230,6 +230,7 @@ fn schedule_from_payload(payload: SchedulePayload) -> Result<scheduler::Schedule
 
 #[tauri::command]
 fn create_scheduled_task(
+    state: tauri::State<'_, AppDataDir>,
     task_name: String,
     venv_python_path: String,
     script_path: String,
@@ -241,9 +242,15 @@ fn create_scheduled_task(
     let schedule = schedule_from_payload(schedule)?;
     #[cfg(windows)]
     {
+        // Write the embedded launcher into app data (idempotent) so the task
+        // can run the venv interpreter directly instead of through cmd.exe.
+        let launcher_path = windows_scheduler::ensure_launcher(&state.0)?
+            .to_string_lossy()
+            .to_string();
         return windows_scheduler::create_task(&windows_scheduler::CreateTaskSpec {
             task_name,
             venv_python_path,
+            launcher_path,
             script_path,
             arguments,
             working_directory,
@@ -252,21 +259,25 @@ fn create_scheduled_task(
         });
     }
     #[cfg(not(windows))]
-    scheduler::execute_command(scheduler::build_create_command(
-        scheduler::CreateScheduledTask {
-            task_name,
-            venv_python_path,
-            script_path,
-            arguments,
-            working_directory,
-            log_directory,
-            schedule,
-        },
-    )?)
+    {
+        let _ = state;
+        scheduler::execute_command(scheduler::build_create_command(
+            scheduler::CreateScheduledTask {
+                task_name,
+                venv_python_path,
+                script_path,
+                arguments,
+                working_directory,
+                log_directory,
+                schedule,
+            },
+        )?)
+    }
 }
 
 #[tauri::command]
 fn update_scheduled_task(
+    state: tauri::State<'_, AppDataDir>,
     task_name: String,
     venv_python_path: String,
     script_path: String,
@@ -278,11 +289,16 @@ fn update_scheduled_task(
     let schedule = schedule_from_payload(schedule)?;
     #[cfg(windows)]
     {
+        // Same launcher path as create (idempotent write, keeps in sync).
+        let launcher_path = windows_scheduler::ensure_launcher(&state.0)?
+            .to_string_lossy()
+            .to_string();
         // Native registration uses TASK_CREATE_OR_UPDATE, so update is an
         // upsert of the same definition used by create.
         return windows_scheduler::create_task(&windows_scheduler::CreateTaskSpec {
             task_name,
             venv_python_path,
+            launcher_path,
             script_path,
             arguments,
             working_directory,
@@ -291,7 +307,10 @@ fn update_scheduled_task(
         });
     }
     #[cfg(not(windows))]
-    scheduler::execute_command(scheduler::build_update_command(&task_name, &arguments)?)
+    {
+        let _ = state;
+        scheduler::execute_command(scheduler::build_update_command(&task_name, &arguments)?)
+    }
 }
 
 #[tauri::command]

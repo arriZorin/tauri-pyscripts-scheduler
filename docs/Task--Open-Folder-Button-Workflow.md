@@ -15,7 +15,7 @@ When the user clicks the **Open Folder** button on a task row, the app opens Win
 3. **TS service** (`FolderRevealer.ts`) adapts to the native command — `TauriFolderRevealer.reveal()` invokes `reveal_in_explorer`.
 4. **Rust backend** (`lib.rs`) validates the path via `explorer_select_arg`, checks it exists, and spawns `explorer.exe /select,<path>` — no blocking, the Explorer window is the feedback.
 
-This flow is the first on the Task page to require a **dedicated, non-generic** Rust command: `reveal_in_explorer` (registered in `invoke_handler` at `src-tauri/src/lib.rs:495`). It spawns the Windows shell command and returns immediately. There is no success banner — the Explorer window opening is the success signal; failures surface through the existing `operationError` banner.
+This flow is the first on the Task page to require a **dedicated, non-generic** Rust command: `reveal_in_explorer` (registered in `invoke_handler` at `src-tauri/src/lib.rs:508`). It spawns the Windows shell command and returns immediately. There is no success banner — the Explorer window opening is the success signal; failures surface through the existing `operationError` banner.
 
 ---
 
@@ -62,9 +62,9 @@ src-tauri/
     └── lib.rs                              ← reveal_in_explorer command + explorer_select_arg helper + unit tests
 ```
 
-**Relevant existing commands (registered in `invoke_handler`, `src-tauri/src/lib.rs:453`):**
+**Relevant commands (registered in `invoke_handler`, `src-tauri/src/lib.rs:508`):**
 
-- `reveal_in_explorer` — **NEW dedicated command** for this flow (`lib.rs:178`, registered at `lib.rs:495`)
+- `reveal_in_explorer` — **NEW dedicated command** for this flow (`lib.rs:178`, registered at `lib.rs:508`)
 - `path_exists` — existing generic primitive, the model for `explorer_select_arg` validation
 - `run_scheduled_task` — used by Run Now (unrelated to this flow)
 
@@ -208,7 +208,7 @@ The `/select,` form makes Explorer open the script's folder **with the file high
 
 ### Step 4 — Verification (unit tests)
 
-**Rust (`lib.rs:676-716`):** `explorer_select_arg` normalizes forward slashes, keeps backslashes, and rejects empty / relative / bare-name paths; `reveal_in_explorer` rejects relative paths (the spawn itself is not tested — it launches a GUI process).
+**Rust (`lib.rs:167-175`):** `explorer_select_arg` normalizes forward slashes, keeps backslashes, and rejects empty / relative / bare-name paths; `reveal_in_explorer` rejects relative paths (the spawn itself is not tested — it launches a GUI process).
 
 **Frontend (`TaskView.test.ts:466`, `:480`):** clicking `open-folder-task-<id>` calls the fake revealer with the script's path (`C:/scripts/backup.py`); a rejecting revealer surfaces the raw error through the `task-operation-error` banner.
 
@@ -222,7 +222,7 @@ The `/select,` form makes Explorer open the script's folder **with the file high
 | `openFolder()` handler | ✅ Implemented (`TaskView.vue:433`) |
 | Script-path resolution from task | ✅ Implemented (`scripts.value.find(...)` in handler) |
 | Folder revealer port + Tauri adapter | ✅ Implemented (`FolderRevealer.ts`) |
-| Dedicated Rust command `reveal_in_explorer` | ✅ Implemented (`lib.rs:178`, registered `lib.rs:495`) |
+| Dedicated Rust command `reveal_in_explorer` | ✅ Implemented (`lib.rs:178`, registered `lib.rs:508`) |
 | Explorer `/select,<path>` reveal behavior | ✅ Implemented (`explorer_select_arg`, `lib.rs:167`) |
 | Path validation (empty/relative/non-file) | ✅ Implemented (Rust, with unit tests) |
 | Error banner on failure | ✅ Implemented (existing `operationError` + `errorMessage`) |
