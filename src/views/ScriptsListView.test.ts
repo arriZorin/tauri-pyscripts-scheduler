@@ -136,7 +136,10 @@ describe('ScriptsListView', () => {
     expect(container.querySelector('.region.header h1')?.textContent?.trim()).toBe('Scripts')
     expect(container.querySelector('.region.header p')?.textContent?.trim()).toBe('Python scripts in the library')
     expect(container.querySelector('.region.footer')?.textContent?.trim()).toBe('© 2026 Scripts Management')
-    expect(buttonTexts(container).sort()).toEqual(['Add File', 'Add Folder', 'Refresh'])
+    const texts = buttonTexts(container)
+    expect(texts).toContain('Add File')
+    expect(texts).toContain('Add Folder')
+    expect(texts).toContain('Refresh')
 
     app.unmount()
   })
@@ -298,8 +301,8 @@ describe('ScriptsListView', () => {
     await nextTick()
     await flush()
 
-    // Empty repo → no rows after the initial auto-load
-    expect(Array.from(container.querySelectorAll('tbody tr'))).toHaveLength(0)
+    // Empty repo → no data rows after the initial auto-load (only the empty-state row)
+    expect(Array.from(container.querySelectorAll('[data-testid="data-table-row"]'))).toHaveLength(0)
 
     // External change: a script lands in the store after mount
     repo.items.push({

@@ -34,37 +34,33 @@
         <div v-if="repairError" data-testid="repair-error" role="alert" class="alert alert-error text-red-600"><AlertIcon kind="error" /><span>{{ repairError }}</span></div>
         <div v-if="summary" class="alert alert-info text-gray-600" role="alert"><AlertIcon kind="info" /><span>{{ summary }}</span></div>
       </div>
-      <table data-testid="script-table" class="table table-zebra w-full text-sm">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Path</th>
-            <th>Status</th>
-            <th>Created</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="s in sortedScripts" :key="s.id">
-            <td>{{ s.name }}</td>
-            <td>
-              {{ s.path }}
-              <span v-if="missingScriptIds.includes(s.id)" class="badge badge-warning ml-2" :data-testid="`missing-script-${s.id}`">Missing</span>
-            </td>
-            <td>
-              <span class="badge" :class="usedScriptIds.has(s.id) ? 'badge-success' : 'badge-ghost'" :data-testid="`script-status-${s.id}`">{{ usedScriptIds.has(s.id) ? 'Used' : 'Unused' }}</span>
-            </td>
-            <td :title="s.createdAt"><RelativeTime :date="s.createdAt" /></td>
-            <td>
-              <div class="join">
-                <button v-if="!missingScriptIds.includes(s.id)" @click="openEditDialog(s)" :data-testid="`edit-script-${s.id}`" class="btn btn-xs join-item" :title="`Edit ${s.name}`">Edit</button>
-                <button v-if="missingScriptIds.includes(s.id)" @click="handleRepair(s)" :data-testid="`repair-script-${s.id}`" class="btn btn-xs btn-warning join-item" :title="`Repair ${s.name}`">Repair</button>
-                <button @click="handleDelete(s)" :data-testid="`delete-script-${s.id}`" class="btn btn-xs btn-error join-item" :title="`Delete ${s.name}`">Delete</button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <DataTable
+        :rows="scripts"
+        :columns="columns"
+        class="text-sm"
+        table-testid="script-table"
+        :row-key="(s) => s.id"
+        search-placeholder="Search scripts…"
+        empty-message="No scripts yet. Add a .py file or folder."
+      >
+        <template #path="{ row: s }">
+          {{ s.path }}
+          <span v-if="missingScriptIds.includes(s.id)" class="badge badge-warning ml-2" :data-testid="`missing-script-${s.id}`">Missing</span>
+        </template>
+        <template #status="{ row: s }">
+          <span class="badge" :class="usedScriptIds.has(s.id) ? 'badge-success' : 'badge-ghost'" :data-testid="`script-status-${s.id}`">{{ usedScriptIds.has(s.id) ? 'Used' : 'Unused' }}</span>
+        </template>
+        <template #created="{ row: s }">
+          <RelativeTime :date="s.createdAt" />
+        </template>
+        <template #actions="{ row: s }">
+          <div class="join">
+            <button v-if="!missingScriptIds.includes(s.id)" @click="openEditDialog(s)" :data-testid="`edit-script-${s.id}`" class="btn btn-xs join-item" :title="`Edit ${s.name}`">Edit</button>
+            <button v-if="missingScriptIds.includes(s.id)" @click="handleRepair(s)" :data-testid="`repair-script-${s.id}`" class="btn btn-xs btn-warning join-item" :title="`Repair ${s.name}`">Repair</button>
+            <button @click="handleDelete(s)" :data-testid="`delete-script-${s.id}`" class="btn btn-xs btn-error join-item" :title="`Delete ${s.name}`">Delete</button>
+          </div>
+        </template>
+      </DataTable>
 
 
       <!-- Edit Dialog -->
@@ -167,9 +163,6 @@
           <button @click.prevent="skipDeps">close</button>
         </form>
       </dialog>
-      <div class="card-body">
-        <div v-if="scripts.length === 0" class="alert alert-info text-gray-600" role="alert"><AlertIcon kind="info" /><span>No scripts yet. Add a .py file or folder.</span></div>
-      </div>
     </main>
     <footer class="region footer card p-4 m-2 rounded border border-gray-300 bg-gray-100 mt-4 text-center text-sm text-gray-500 dark:bg-[#2f2f2f] dark:border-[#404040] dark:text-[#999999]">
       <div class="card-body">
@@ -183,10 +176,11 @@
 import { computed, defineComponent, ref } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import AlertIcon from '../components/icons/AlertIcon.vue';
+import DataTable from '../components/DataTable.vue';
+import type { DataTableColumn } from '../components/DataTableColumn';
 import { useAppContext } from '../composables/useAppContext';
 import { useAutoDismiss } from '../composables/useAutoDismiss';
 import { useScripts } from '../services/script/import/useScripts';
-import { sortScripts } from '../services/script/scriptLabels';
 import { findMissingScriptIds } from '../services/script/scriptReconciliation';
 import { onMounted } from 'vue';
 import type { Script } from '../models/Script';
@@ -206,8 +200,22 @@ const RelativeTime = defineComponent({
 const { scriptRepository: repository, picker, scanner, taskRepository, taskScheduler, scriptPathChecker, venvSync } = useAppContext();
 
 const { scripts, error, busy, addScriptFile, addScriptFolder, load } = useScripts({ repository, picker, scanner });
-const sortedScripts = computed(() => sortScripts(scripts.value));
 const missingScriptIds = ref<string[]>([]);
+
+const columns: DataTableColumn<Script>[] = [
+  { key: 'name', label: 'Name', sortable: true, searchable: true },
+  { key: 'path', label: 'Path', sortable: false, searchable: true },
+  { key: 'status', label: 'Status', sortable: false, searchable: false },
+  {
+    key: 'created',
+    label: 'Created',
+    sortable: true,
+    searchable: false,
+    value: (s) => s.createdAt,
+    cellTitle: (s) => s.createdAt,
+  },
+  { key: 'actions', label: 'Actions', sortable: false, searchable: false },
+];
 
 const usedScriptIds = ref<Set<string>>(new Set());
 
