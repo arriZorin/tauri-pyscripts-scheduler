@@ -16,7 +16,7 @@ export interface DataTableColumn<T = unknown> {
   /** Reads the cell value from a row; defaults to `row[col.key]`. */
   value?: (row: T) => unknown
   /** Overrides the value used for sorting (e.g. numeric/date for a string cell). */
-  sortValue?: (row: T) => string | number
+  sortValue?: (row: T) => string | number | null
   /** Overrides the text searched for this column. */
   searchValue?: (row: T) => string
   /** Optional native tooltip text bound to every <td> of this column. */

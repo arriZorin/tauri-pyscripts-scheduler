@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import DataTable from '../components/DataTable.vue'
+import type { DataTableColumn } from '../components/DataTableColumn'
 import AlertIcon from '../components/icons/AlertIcon.vue'
 import FolderIcon from '../components/icons/FolderIcon.vue'
 import PencilIcon from '../components/icons/PencilIcon.vue'
@@ -476,6 +478,22 @@ function scheduleLabel(schedule: Schedule): string {
   return `Every ${schedule.every} ${schedule.unit} from ${schedule.startAt}`
 }
 
+const taskColumns: DataTableColumn<Task>[] = [
+  { key: 'name', label: 'Name', sortable: true, searchable: true },
+  { key: 'script', label: 'Script', sortable: true, searchable: true, value: (t) => scriptLabelOf(t.scriptId) },
+  { key: 'schedule', label: 'Schedule', sortable: true, searchable: true, value: (t) => scheduleLabel(t.schedule) },
+  { key: 'status', label: 'Status', sortable: false, searchable: false },
+  { key: 'actions', label: 'Actions', sortable: false, searchable: false },
+]
+
+const runColumns: DataTableColumn<TaskRun>[] = [
+  { key: 'task', label: 'Task', sortable: true, searchable: true, value: (r) => taskNameOf(r.taskId) },
+  { key: 'status', label: 'Status', sortable: true, searchable: true, value: (r) => r.status },
+  { key: 'started', label: 'Started', sortable: true, searchable: false, sortValue: (r) => Date.parse(r.startedAt), value: (r) => new Date(r.startedAt).toLocaleString() },
+  { key: 'finished', label: 'Finished', sortable: true, searchable: false, sortValue: (r) => (r.finishedAt ? Date.parse(r.finishedAt) : null), value: (r) => (r.finishedAt ? new Date(r.finishedAt).toLocaleString() : '-') },
+  { key: 'output', label: 'Output', sortable: false, searchable: false, value: (r) => runOutput(r) },
+]
+
 onMounted(() => {
   load()
   loadRuns()
@@ -523,35 +541,42 @@ onMounted(() => {
         </div>
       </div>
       <div v-if="tasks.length === 0" class="alert alert-info" data-testid="task-empty-state" role="alert"><AlertIcon kind="info" /><span>No tasks yet.</span></div>
-      <table v-else class="table table-zebra w-full" data-testid="task-table">
-        <thead><tr><th>Name</th><th>Script</th><th>Schedule</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody>
-          <tr v-for="task in tasks" :key="task.id" :data-testid="`task-row-${task.id}`">
-            <td>{{ task.name }}</td>
-            <td>{{ scriptLabelOf(task.scriptId) }}</td>
-            <td>{{ scheduleLabel(task.schedule) }}</td>
-            <td><span v-if="hasMissingScript(task.scriptId)" class="badge badge-error" data-testid="script-missing-badge">script_missing</span><span v-else-if="isTaskMissing(task.id)" class="badge badge-warning" data-testid="scheduler-missing-badge">unregistered</span><span v-else class="badge" :class="task.enabled ? 'badge-success' : 'badge-ghost'">{{ task.enabled ? 'Enabled' : 'Disabled' }}</span></td>
-            <td><div class="join">
-              <template v-if="hasMissingScript(task.scriptId)">
-                <button class="btn btn-xs btn-ghost join-item" :data-testid="`edit-task-${task.id}`" :title="`Edit ${task.name}`" @click="openEdit(task)"><PencilIcon /></button>
-                <button v-if="!isTaskMissing(task.id) && task.enabled" class="btn btn-xs btn-ghost join-item" :data-testid="`disable-task-${task.id}`" :title="`Disable ${task.name}`" @click="toggle(task)"><PowerIcon /></button>
-                <button class="btn btn-xs btn-ghost join-item text-error" :data-testid="`delete-task-${task.id}`" :title="`Delete ${task.name}`" @click="requestDelete(task)"><TrashIcon /></button>
-              </template>
-              <template v-else-if="isTaskMissing(task.id)">
-                <button class="btn btn-xs btn-ghost join-item text-warning" :data-testid="`repair-task-${task.id}`" :title="`Repair ${task.name}`" :disabled="repairingTaskId === task.id || repairing" @click="repairTaskRow(task)"><WrenchIcon /></button>
-                <button class="btn btn-xs btn-ghost join-item text-error" :data-testid="`delete-task-${task.id}`" :title="`Delete ${task.name}`" @click="requestDelete(task)"><TrashIcon /></button>
-              </template>
-              <template v-else>
-                <button class="btn btn-xs btn-ghost join-item" :data-testid="`edit-task-${task.id}`" :title="`Edit ${task.name}`" @click="openEdit(task)"><PencilIcon /></button>
-                <button class="btn btn-xs btn-ghost join-item" :data-testid="`toggle-task-${task.id}`" :title="task.enabled ? `Disable ${task.name}` : `Enable ${task.name}`" @click="toggle(task)"><PowerIcon /></button>
-                <button class="btn btn-xs btn-ghost join-item text-primary" :data-testid="`run-task-${task.id}`" :title="`Run ${task.name}`" :disabled="runningTaskId === task.id || !task.enabled" @click="runTask(task)"><span v-if="runningTaskId === task.id" class="loading loading-spinner loading-xs"></span><PlayIcon v-else /></button>
-                <button class="btn btn-xs btn-ghost join-item text-primary" :data-testid="`open-folder-task-${task.id}`" :title="`Open folder: ${scriptLabelOf(task.scriptId)}`" @click="openFolder(task)"><FolderIcon /></button>
-                <button class="btn btn-xs btn-ghost join-item text-error" :data-testid="`delete-task-${task.id}`" :title="`Delete ${task.name}`" @click="requestDelete(task)"><TrashIcon /></button>
-              </template>
-            </div></td>
-          </tr>
-        </tbody>
-      </table>
+      <DataTable
+        v-else
+        :rows="tasks"
+        :columns="taskColumns"
+        table-testid="task-table"
+        :row-key="(t) => t.id"
+        :row-testid="(t) => `task-row-${t.id}`"
+        search-placeholder="Search tasks…"
+        empty-message="No tasks match your search."
+      >
+        <template #status="{ row: t }">
+          <span v-if="hasMissingScript(t.scriptId)" class="badge badge-error" data-testid="script-missing-badge">script_missing</span>
+          <span v-else-if="isTaskMissing(t.id)" class="badge badge-warning" data-testid="scheduler-missing-badge">unregistered</span>
+          <span v-else class="badge" :class="t.enabled ? 'badge-success' : 'badge-ghost'">{{ t.enabled ? 'Enabled' : 'Disabled' }}</span>
+        </template>
+        <template #actions="{ row: t }">
+          <div class="join">
+            <template v-if="hasMissingScript(t.scriptId)">
+              <button class="btn btn-xs btn-ghost join-item" :data-testid="`edit-task-${t.id}`" :title="`Edit ${t.name}`" @click="openEdit(t)"><PencilIcon /></button>
+              <button v-if="!isTaskMissing(t.id) && t.enabled" class="btn btn-xs btn-ghost join-item" :data-testid="`disable-task-${t.id}`" :title="`Disable ${t.name}`" @click="toggle(t)"><PowerIcon /></button>
+              <button class="btn btn-xs btn-ghost join-item text-error" :data-testid="`delete-task-${t.id}`" :title="`Delete ${t.name}`" @click="requestDelete(t)"><TrashIcon /></button>
+            </template>
+            <template v-else-if="isTaskMissing(t.id)">
+              <button class="btn btn-xs btn-ghost join-item text-warning" :data-testid="`repair-task-${t.id}`" :title="`Repair ${t.name}`" :disabled="repairingTaskId === t.id || repairing" @click="repairTaskRow(t)"><WrenchIcon /></button>
+              <button class="btn btn-xs btn-ghost join-item text-error" :data-testid="`delete-task-${t.id}`" :title="`Delete ${t.name}`" @click="requestDelete(t)"><TrashIcon /></button>
+            </template>
+            <template v-else>
+              <button class="btn btn-xs btn-ghost join-item" :data-testid="`edit-task-${t.id}`" :title="`Edit ${t.name}`" @click="openEdit(t)"><PencilIcon /></button>
+              <button class="btn btn-xs btn-ghost join-item" :data-testid="`toggle-task-${t.id}`" :title="t.enabled ? `Disable ${t.name}` : `Enable ${t.name}`" @click="toggle(t)"><PowerIcon /></button>
+              <button class="btn btn-xs btn-ghost join-item text-primary" :data-testid="`run-task-${t.id}`" :title="`Run ${t.name}`" :disabled="runningTaskId === t.id || !t.enabled" @click="runTask(t)"><span v-if="runningTaskId === t.id" class="loading loading-spinner loading-xs"></span><PlayIcon v-else /></button>
+              <button class="btn btn-xs btn-ghost join-item text-primary" :data-testid="`open-folder-task-${t.id}`" :title="`Open folder: ${scriptLabelOf(t.scriptId)}`" @click="openFolder(t)"><FolderIcon /></button>
+              <button class="btn btn-xs btn-ghost join-item text-error" :data-testid="`delete-task-${t.id}`" :title="`Delete ${t.name}`" @click="requestDelete(t)"><TrashIcon /></button>
+            </template>
+          </div>
+        </template>
+      </DataTable>
       <div class="divider"></div>
       <section class="mt-8" data-testid="run-history-panel">
         <div class="flex flex-row items-center justify-between mb-3">
@@ -567,26 +592,21 @@ onMounted(() => {
           </div>
         </div>
         <div v-if="filteredRuns().length === 0" class="alert alert-info" data-testid="runs-empty-state" role="alert"><AlertIcon kind="info" /><span>No runs yet.</span></div>
-        <table v-else class="table table-zebra w-full" data-testid="runs-table">
-          <thead>
-            <tr>
-              <th>Task</th>
-              <th>Status</th>
-              <th>Started</th>
-              <th>Finished</th>
-              <th>Output</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="run in filteredRuns()" :key="run.id" :data-testid="`run-row-${run.id}`">
-              <td>{{ taskNameOf(run.taskId) }}</td>
-              <td><span class="badge" :class="runStatusBadge(run.status)">{{ run.status }}</span></td>
-              <td>{{ new Date(run.startedAt).toLocaleString() }}</td>
-              <td>{{ run.finishedAt ? new Date(run.finishedAt).toLocaleString() : '-' }}</td>
-              <td><span class="whitespace-pre-wrap text-xs">{{ runOutput(run) }}</span></td>
-            </tr>
-          </tbody>
-        </table>
+        <DataTable
+          v-else
+          :rows="filteredRuns()"
+          :columns="runColumns"
+          table-testid="runs-table"
+          :row-key="(r) => r.id"
+          :row-testid="(r) => `run-row-${r.id}`"
+          initial-sort-key="started"
+          initial-sort-dir="desc"
+          search-placeholder="Search runs…"
+          empty-message="No runs match your search."
+        >
+          <template #status="{ row: r }"><span class="badge" :class="runStatusBadge(r.status)">{{ r.status }}</span></template>
+          <template #output="{ row: r }"><span class="whitespace-pre-wrap text-xs">{{ runOutput(r) }}</span></template>
+        </DataTable>
       </section>
     </main>
     <footer class="region footer card p-4 m-2 rounded border border-gray-300 bg-gray-100 mt-4 text-center text-sm text-gray-500 dark:bg-[#2f2f2f] dark:border-[#404040] dark:text-[#999999]"><div class="card-body"><p>&copy; 2026 Scripts Management</p></div></footer>

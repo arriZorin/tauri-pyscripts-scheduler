@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import DataTable from '../components/DataTable.vue'
+import type { DataTableColumn } from '../components/DataTableColumn'
 import AlertIcon from '../components/icons/AlertIcon.vue'
 import { useAutoDismiss } from '../composables/useAutoDismiss'
 import { useAppContext } from '../composables/useAppContext'
@@ -11,6 +13,15 @@ const stats = ref<{ count: number; createdDate: string } | null>(null)
 const clearTarget = ref(false)
 const feedback = ref('')
 useAutoDismiss(feedback)
+
+const logColumns: DataTableColumn<LogEntry>[] = [
+  { key: 'time', label: 'Time', sortable: true, searchable: false, sortValue: (l) => Date.parse(l.createdAt), value: (l) => new Date(l.createdAt).toLocaleString() },
+  { key: 'mode', label: 'Mode', sortable: true, searchable: true, value: (l) => l.mode },
+  { key: 'level', label: 'Level', sortable: true, searchable: true, value: (l) => l.level },
+  { key: 'source', label: 'Source', sortable: true, searchable: true, value: (l) => l.source },
+  { key: 'message', label: 'Message', sortable: false, searchable: true, value: (l) => l.message },
+  { key: 'duration', label: 'Duration', sortable: true, searchable: false, sortValue: (l) => (l.durationMs === null ? -1 : l.durationMs), value: (l) => (l.durationMs === null ? '-' : `${l.durationMs} ms`) },
+]
 
 async function load() {
   try {
@@ -68,19 +79,21 @@ onMounted(load)
     <main class="region body card p-4 m-2 rounded border border-gray-300 bg-white min-h-[200px] dark:bg-[#333333] dark:border-[#404040]">
       <div v-if="feedback" class="alert alert-success mb-3" data-testid="log-feedback" role="alert"><AlertIcon kind="success" /><span>{{ feedback }}</span></div>
       <div v-if="logs.length === 0" class="alert alert-info" data-testid="log-empty-state" role="alert"><AlertIcon kind="info" /><span>No logs yet.</span></div>
-      <table v-else class="table table-zebra w-full" data-testid="log-table">
-        <thead><tr><th>Time</th><th>Mode</th><th>Level</th><th>Source</th><th>Message</th><th>Duration</th></tr></thead>
-        <tbody>
-          <tr v-for="log in logs" :key="log.id" :data-testid="`log-row-${log.id}`">
-            <td>{{ new Date(log.createdAt).toLocaleString() }}</td>
-            <td><span class="badge" :class="log.mode === 'prod' ? 'badge-success' : 'badge-info'" data-testid="log-mode-badge">{{ log.mode }}</span></td>
-            <td><span class="badge" :class="log.level === 'error' ? 'badge-error' : 'badge-ghost'">{{ log.level }}</span></td>
-            <td>{{ log.source }}</td>
-            <td>{{ log.message }}</td>
-            <td>{{ log.durationMs === null ? '-' : `${log.durationMs} ms` }}</td>
-          </tr>
-        </tbody>
-      </table>
+      <DataTable
+        v-else
+        :rows="logs"
+        :columns="logColumns"
+        table-testid="log-table"
+        :row-key="(l) => l.id"
+        :row-testid="(l) => `log-row-${l.id}`"
+        initial-sort-key="time"
+        initial-sort-dir="desc"
+        search-placeholder="Search logs…"
+        empty-message="No log entries match your search."
+      >
+        <template #mode="{ row: l }"><span class="badge" :class="l.mode === 'prod' ? 'badge-success' : 'badge-info'" data-testid="log-mode-badge">{{ l.mode }}</span></template>
+        <template #level="{ row: l }"><span class="badge" :class="l.level === 'error' ? 'badge-error' : 'badge-ghost'">{{ l.level }}</span></template>
+      </DataTable>
     </main>
     <footer class="region footer card p-4 m-2 rounded border border-gray-300 bg-gray-100 mt-4 text-center text-sm text-gray-500 dark:bg-[#2f2f2f] dark:border-[#404040] dark:text-[#999999]"><div class="card-body"><p>&copy; 2026 Scripts Management</p></div></footer>
 

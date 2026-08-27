@@ -41,7 +41,7 @@ src/
 ├─ components/
 │  ├─ DataTable.vue            ← Step 1: generic sortable/searchable/paginated DaisyUI table
 │  ├─ DataTableColumn.ts       ← Step 2: typed column contract (DataTableColumn<T>)
-│  ├─ DataTable.test.ts        ← Step 4: 17 unit tests (RED→GREEN)
+│  ├─ DataTable.test.ts        ← Step 4: 19 unit tests (RED→GREEN)
 │  └─ icons/…
 ├─ views/
 │  └─ ScriptsListView.vue      ← Step 3: wires rows + columns + per-column slots
@@ -60,8 +60,10 @@ src/
 ## Dependency Wiring
 
 `DataTable` is self-contained — it imports only `vue` and the `DataTableColumn`
-type. No app-context, no Tauri IPC, no repository access. `ScriptsListView` is
-the only consumer today; it binds props directly:
+type. No app-context, no Tauri IPC, no repository access. Consumers bind props
+directly; `ScriptsListView` uses it for the script library, and the Task and
+Logging pages use it for their tables (see `Task--DataTable-Table-Workflow.md`
+and `Logging--DataTable-Table-Workflow.md`):
 
 ```vue
 <DataTable
@@ -198,18 +200,18 @@ Flow chain: `DataTable` receives `scripts` → `filtered` → `sorted` → `page
 | Pagination | ✅ `DataTable.vue:90-98,224-250` — prev/page/next + `Showing X–Y of Z` |
 | Cell slots / accessors | ✅ `DataTable.vue:53-61,203-215`; `DataTableColumn.ts:7-28` |
 | Empty state | ✅ `DataTable.vue:199` — `emptyMessage` |
-| Tests | ✅ `src/components/DataTable.test.ts` (17) — full suite 295 green |
+| Tests | ✅ `src/components/DataTable.test.ts` (19) — full suite 297 green |
 | Rust backend | ✅ none — zero `invoke()` calls; no new entries in `invoke_handler` (`lib.rs:508`) |
 
-**Conclusion:** The Scripts page table is now a reusable, dependency-free
+**Conclusion:** The Scripts page table is a reusable, dependency-free
 `DataTable` (sort + search + rows-per-page + pagination) with the DaisyUI look,
 while every pre-existing testid and the existing `useScripts` data path are
-preserved. The component can be dropped into another table (Task runs,
-Logging) with just a columns array and per-column slots.
+preserved. The component is now also used by the Task page (task + execution
+history tables) and the Logging page, which rely on the `rowTestid` and
+`initialSortDir` props added in 2026-08-27 (see `Task--DataTable-Table-Workflow.md`
+and `Logging--DataTable-Table-Workflow.md`).
 
 **Optional future work:**
-- Migrate the TaskView runs table and LoggingView table to `DataTable`
-  (same columns + slots pattern).
 - Persist the chosen rows-per-page via the emitted `update:pageSize` event.
 - Window the page-number buttons once datasets exceed ~10 pages.
 

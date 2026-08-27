@@ -21,6 +21,10 @@ interface Props {
   rowKey?: (row: any) => string
   /** data-testid on the <table>. Defaults to "data-table". */
   tableTestid?: string
+  /** data-testid on each <tr>. Defaults to "data-table-row". */
+  rowTestid?: (row: any) => string
+  /** Initial sort direction. Default 'asc'. */
+  initialSortDir?: 'asc' | 'desc'
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -33,6 +37,8 @@ const props = withDefaults(defineProps<Props>(), {
   initialSortKey: '',
   rowKey: undefined,
   tableTestid: 'data-table',
+  rowTestid: undefined,
+  initialSortDir: 'asc',
 })
 
 const emit = defineEmits<{ 'update:pageSize': [value: number] }>()
@@ -41,7 +47,7 @@ const search = ref('')
 const page = ref(1)
 const pageSize = ref(props.pageSize)
 const sortKey = ref(props.initialSortKey || (props.columns.find((c) => c.sortable)?.key ?? ''))
-const sortDir = ref<'asc' | 'desc'>('asc')
+const sortDir = ref<'asc' | 'desc'>(props.initialSortDir)
 
 watch(
   () => props.pageSize,
@@ -200,7 +206,7 @@ function rowKeyOf(row: any, index: number): string {
               {{ emptyMessage }}
             </td>
           </tr>
-          <tr v-for="(row, index) in paged" :key="rowKeyOf(row, index)" data-testid="data-table-row">
+          <tr v-for="(row, index) in paged" :key="rowKeyOf(row, index)" :data-testid="rowTestid ? rowTestid(row) : 'data-table-row'">
             <td
               v-for="col in columns"
               :key="col.key"

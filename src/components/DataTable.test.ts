@@ -347,4 +347,19 @@ describe('DataTable', () => {
     expect(second.container.querySelector('[data-testid="data-table-empty"]')?.textContent).toContain('No records found.')
     second.app.unmount()
   })
+
+  it('honours an initial sort direction of descending', async () => {
+    const { container, app } = mountTable(sampleRows.slice(0, 5), { initialSortKey: 'name', initialSortDir: 'desc' })
+    await nextTick()
+    expect(rowTexts(container)[0]).toContain('script-05.py')
+    app.unmount()
+  })
+
+  it('renders a custom row testid when provided', async () => {
+    const { container, app } = mountTable(sampleRows.slice(0, 2), { rowTestid: (r: Row) => `row-${r.id}` })
+    await nextTick()
+    expect(container.querySelectorAll('[data-testid="row-1"]')).toHaveLength(1)
+    expect(container.querySelectorAll('[data-testid="data-table-row"]')).toHaveLength(0)
+    app.unmount()
+  })
 })
