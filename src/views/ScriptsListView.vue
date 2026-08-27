@@ -1,38 +1,48 @@
 <template>
   <div class="view-container w-full">
     <header class="region header card card-compact bg-base-100 border border-base-200 rounded-box shadow-sm p-0 mb-4">
-  <div class="card-body p-4 m-0">
-    <div class="flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-5 h-5 stroke-current">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
+      <div class="card-body p-4 m-0">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-5 h-5 stroke-current">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <div>
+              <h1 class="text-lg font-bold">Scripts</h1>
+              <p class="text-sm text-base-content/60">Python scripts in the library</p>
+            </div>
+          </div>
+          <div class="flex gap-2 mb-4">
+            <button @click="handleAddFile" class="btn btn-sm btn-primary" data-testid="add-file-btn">Add File</button>
+            <button @click="handleAddFolder" class="btn btn-sm btn-primary" data-testid="add-folder-btn">
+              Add Folder
+            </button>
+            <button @click="handleRefresh" class="btn btn-primary btn-sm" data-testid="refresh-btn">Refresh</button>
+          </div>
         </div>
-        <div>
-          <h1 class="text-lg font-bold">Scripts</h1>
-          <p class="text-sm text-base-content/60">Python scripts in the library</p>
+        <div class="mt-3 pt-3 border-t border-base-200 flex flex-wrap gap-x-4 gap-y-1 text-xs text-base-content/60">
+          <span>{{ scripts.length }} script{{ scripts.length === 1 ? '' : 's' }}</span>
+          <span>{{ usedScriptIds.size }} used · {{ scripts.length - usedScriptIds.size }} unused</span>
+          <span v-if="missingScriptIds.length > 0" class="text-warning">{{ missingScriptIds.length }} missing</span>
         </div>
       </div>
-      <button @click="handleRefresh" class="btn btn-primary btn-sm" data-testid="refresh-btn">Refresh</button>
-    </div>
-    <div class="mt-3 pt-3 border-t border-base-200 flex flex-wrap gap-x-4 gap-y-1 text-xs text-base-content/60">
-      <span>{{ scripts.length }} script{{ scripts.length === 1 ? '' : 's' }}</span>
-      <span>{{ usedScriptIds.size }} used · {{ scripts.length - usedScriptIds.size }} unused</span>
-      <span v-if="missingScriptIds.length > 0" class="text-warning">{{ missingScriptIds.length }} missing</span>
-    </div>
-  </div>
-</header>
-    <main class="region body card p-4 m-2 rounded border border-gray-300 bg-white min-h-[200px] dark:bg-[#333333] dark:border-[#404040]">
-      <div class="flex gap-2 mb-4">
-        <button @click="handleAddFile" class="btn btn-primary px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-500 btn-script-action" data-testid="add-file-btn">Add File</button>
-        <button @click="handleAddFolder" class="btn btn-primary px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-500 btn-script-action" data-testid="add-folder-btn">Add Folder</button>
+    </header>
+    <main
+      class="region body card p-4 m-2 rounded border border-gray-300 bg-white min-h-[200px] dark:bg-[#333333] dark:border-[#404040]"
+    >
+      <div v-if="busy" class="alert alert-info text-gray-600" role="alert">
+        <AlertIcon kind="info" /><span>Adding...</span>
       </div>
-      <div class="card-body">
-        <div v-if="busy" class="alert alert-info text-gray-600" role="alert"><AlertIcon kind="info" /><span>Adding...</span></div>
-        <div v-if="error" role="alert" class="alert alert-error text-red-600"><AlertIcon kind="error" /><span>{{ error }}</span></div>
-        <div v-if="repairError" data-testid="repair-error" role="alert" class="alert alert-error text-red-600"><AlertIcon kind="error" /><span>{{ repairError }}</span></div>
-        <div v-if="summary" class="alert alert-info text-gray-600" role="alert"><AlertIcon kind="info" /><span>{{ summary }}</span></div>
+      <div v-if="error" role="alert" class="alert alert-error text-red-600">
+        <AlertIcon kind="error" /><span>{{ error }}</span>
+      </div>
+      <div v-if="repairError" data-testid="repair-error" role="alert" class="alert alert-error text-red-600">
+        <AlertIcon kind="error" /><span>{{ repairError }}</span>
+      </div>
+      <div v-if="summary" class="alert alert-info text-gray-600" role="alert">
+        <AlertIcon kind="info" /><span>{{ summary }}</span>
       </div>
       <DataTable
         :rows="scripts"
@@ -45,23 +55,55 @@
       >
         <template #path="{ row: s }">
           {{ s.path }}
-          <span v-if="missingScriptIds.includes(s.id)" class="badge badge-warning ml-2" :data-testid="`missing-script-${s.id}`">Missing</span>
+          <span
+            v-if="missingScriptIds.includes(s.id)"
+            class="badge badge-warning ml-2"
+            :data-testid="`missing-script-${s.id}`"
+            >Missing</span
+          >
         </template>
         <template #status="{ row: s }">
-          <span class="badge" :class="usedScriptIds.has(s.id) ? 'badge-success' : 'badge-ghost'" :data-testid="`script-status-${s.id}`">{{ usedScriptIds.has(s.id) ? 'Used' : 'Unused' }}</span>
+          <span
+            class="badge"
+            :class="usedScriptIds.has(s.id) ? 'badge-success' : 'badge-neutral badge-outline'"
+            :data-testid="`script-status-${s.id}`"
+            >{{ usedScriptIds.has(s.id) ? 'Used' : 'Unused' }}</span
+          >
         </template>
         <template #created="{ row: s }">
           <RelativeTime :date="s.createdAt" />
         </template>
         <template #actions="{ row: s }">
           <div class="join">
-            <button v-if="!missingScriptIds.includes(s.id)" @click="openEditDialog(s)" :data-testid="`edit-script-${s.id}`" class="btn btn-xs join-item" :title="`Edit ${s.name}`">Edit</button>
-            <button v-if="missingScriptIds.includes(s.id)" @click="handleRepair(s)" :data-testid="`repair-script-${s.id}`" class="btn btn-xs btn-warning join-item" :title="`Repair ${s.name}`">Repair</button>
-            <button @click="handleDelete(s)" :data-testid="`delete-script-${s.id}`" class="btn btn-xs btn-error join-item" :title="`Delete ${s.name}`">Delete</button>
+            <button
+              v-if="!missingScriptIds.includes(s.id)"
+              @click="openEditDialog(s)"
+              :data-testid="`edit-script-${s.id}`"
+              class="btn btn-xs join-item"
+              :title="`Edit ${s.name}`"
+            >
+              Edit
+            </button>
+            <button
+              v-if="missingScriptIds.includes(s.id)"
+              @click="handleRepair(s)"
+              :data-testid="`repair-script-${s.id}`"
+              class="btn btn-xs btn-warning join-item"
+              :title="`Repair ${s.name}`"
+            >
+              Repair
+            </button>
+            <button
+              @click="handleDelete(s)"
+              :data-testid="`delete-script-${s.id}`"
+              class="btn btn-xs btn-error join-item"
+              :title="`Delete ${s.name}`"
+            >
+              Delete
+            </button>
           </div>
         </template>
       </DataTable>
-
 
       <!-- Edit Dialog -->
       <dialog id="edit-dialog" v-if="isEditing" data-testid="edit-dialog" class="modal modal-open" role="dialog">
@@ -70,34 +112,57 @@
           <div class="form-control w-full mb-4">
             <label class="label">
               <span class="label-text">Name</span>
-              <input v-model="editName" type="text" data-testid="edit-name-input" class="input input-bordered w-full" placeholder="Script name" />
+              <input
+                v-model="editName"
+                type="text"
+                data-testid="edit-name-input"
+                class="input input-bordered w-full"
+                placeholder="Script name"
+              />
             </label>
           </div>
           <div class="form-control w-full mb-4">
             <label class="label">
               <span class="label-text">Description</span>
-              <textarea v-model="editDescription" data-testid="edit-description-input" class="textarea textarea-bordered h-20" placeholder="Script description" />
+              <textarea
+                v-model="editDescription"
+                data-testid="edit-description-input"
+                class="textarea textarea-bordered h-20"
+                placeholder="Script description"
+              />
             </label>
           </div>
           <div class="form-control w-full mb-4">
             <label class="label">
               <span class="label-text">Python Version</span>
-              <select v-model="editPythonVersion" data-testid="edit-python-version" class="select select-bordered w-full">
+              <select
+                v-model="editPythonVersion"
+                data-testid="edit-python-version"
+                class="select select-bordered w-full"
+              >
                 <option value="3.11">3.11 (default)</option>
                 <option value="3.12">3.12</option>
                 <option value="3.13">3.13</option>
               </select>
             </label>
           </div>
-          <div v-if="editError" class="alert alert-error mb-4" role="alert"><AlertIcon kind="error" /><span>{{ editError }}</span></div>
+          <div v-if="editError" class="alert alert-error mb-4" role="alert">
+            <AlertIcon kind="error" /><span>{{ editError }}</span>
+          </div>
           <div class="flex justify-between items-center">
             <div class="text-sm text-gray-600">
-              <div class="mb-1">Path: <span class="script-name">{{ selectedScript?.path }}</span></div>
-              <div>Type: <span class="script-name">{{ selectedScript?.type }}</span></div>
+              <div class="mb-1">
+                Path: <span class="script-name">{{ selectedScript?.path }}</span>
+              </div>
+              <div>
+                Type: <span class="script-name">{{ selectedScript?.type }}</span>
+              </div>
             </div>
             <div class="flex gap-2">
               <button @click="saveEdit" data-testid="save-edit-btn" class="btn btn-primary btn-sm">Save</button>
-              <button @click="closeEditDialog" data-testid="cancel-edit-btn" class="btn btn-ghost btn-sm">Cancel</button>
+              <button @click="closeEditDialog" data-testid="cancel-edit-btn" class="btn btn-ghost btn-sm">
+                Cancel
+              </button>
             </div>
           </div>
         </div>
@@ -110,8 +175,16 @@
       <dialog id="delete-dialog" v-if="deleteTarget" data-testid="delete-dialog" class="modal modal-open" role="dialog">
         <div class="modal-box p-4 max-w-md">
           <h3 class="text-lg font-bold mb-2">Delete Script</h3>
-          <p class="text-gray-600 mb-4">Are you sure you want to delete <strong>{{ deleteTarget.name }}</strong>?</p>
-          <div v-if="linkedTasks.length > 0" class="alert alert-warning mb-4" data-testid="linked-tasks-warning" role="alert">
+          <p class="text-gray-600 mb-4">
+            Are you sure you want to delete <strong>{{ deleteTarget.name }}</strong
+            >?
+          </p>
+          <div
+            v-if="linkedTasks.length > 0"
+            class="alert alert-warning mb-4"
+            data-testid="linked-tasks-warning"
+            role="alert"
+          >
             <AlertIcon kind="warning" />
             <div>
               <strong>{{ linkedTasks.length }} linked task(s) will also be deleted:</strong>
@@ -120,14 +193,22 @@
               </ul>
             </div>
           </div>
-          <div v-if="deleteError" class="alert alert-error mb-4" data-testid="delete-error" role="alert"><AlertIcon kind="error" /><span>{{ deleteError }}</span></div>
+          <div v-if="deleteError" class="alert alert-error mb-4" data-testid="delete-error" role="alert">
+            <AlertIcon kind="error" /><span>{{ deleteError }}</span>
+          </div>
           <div class="flex justify-between items-center">
             <div class="text-sm text-gray-500">
-              <div class="mb-1">Path: <span class="script-name">{{ deleteTarget.path }}</span></div>
-              <div>Type: <span class="script-name">{{ deleteTarget.type }}</span></div>
+              <div class="mb-1">
+                Path: <span class="script-name">{{ deleteTarget.path }}</span>
+              </div>
+              <div>
+                Type: <span class="script-name">{{ deleteTarget.type }}</span>
+              </div>
             </div>
             <div class="flex gap-2">
-              <button @click="confirmDelete" data-testid="confirm-delete-btn" class="btn btn-error btn-sm">{{ linkedTasks.length > 0 ? 'Delete script & tasks' : 'Delete' }}</button>
+              <button @click="confirmDelete" data-testid="confirm-delete-btn" class="btn btn-error btn-sm">
+                {{ linkedTasks.length > 0 ? 'Delete script & tasks' : 'Delete' }}
+              </button>
               <button @click="cancelDelete" data-testid="cancel-delete-btn" class="btn btn-ghost btn-sm">Cancel</button>
             </div>
           </div>
@@ -142,17 +223,20 @@
         <div class="modal-box p-4 max-w-md">
           <h3 class="text-lg font-bold mb-2">Dependencies Detected</h3>
           <p class="text-sm text-gray-600 mb-4">
-            No <code>requirements.txt</code> found in this folder. The following
-            third-party packages were detected:
+            No <code>requirements.txt</code> found in this folder. The following third-party packages were detected:
           </p>
           <div class="mb-4 space-y-1">
-            <div v-for="dep in pendingDeps.detected" :key="dep" class="flex items-center gap-2 p-2 bg-gray-50 rounded dark:bg-[#3a3a3a]">
+            <div
+              v-for="dep in pendingDeps.detected"
+              :key="dep"
+              class="flex items-center gap-2 p-2 bg-gray-50 rounded dark:bg-[#3a3a3a]"
+            >
               <code class="text-sm">{{ dep }}</code>
             </div>
           </div>
           <p class="text-sm text-gray-500 mb-4">
-            Create a <code>requirements.txt</code> file? Dependencies will be
-            installed in the folder's virtual environment.
+            Create a <code>requirements.txt</code> file? Dependencies will be installed in the folder's virtual
+            environment.
           </p>
           <div class="flex gap-2 justify-end">
             <button @click="confirmDeps" data-testid="confirm-deps-btn" class="btn btn-primary btn-sm">Create</button>
@@ -164,7 +248,9 @@
         </form>
       </dialog>
     </main>
-    <footer class="region footer card p-4 m-2 rounded border border-gray-300 bg-gray-100 mt-4 text-center text-sm text-gray-500 dark:bg-[#2f2f2f] dark:border-[#404040] dark:text-[#999999]">
+    <footer
+      class="region footer card p-4 m-2 rounded border border-gray-300 bg-gray-100 mt-4 text-center text-sm text-gray-500 dark:bg-[#2f2f2f] dark:border-[#404040] dark:text-[#999999]"
+    >
       <div class="card-body">
         <p>&copy; 2026 Scripts Management</p>
       </div>
@@ -173,39 +259,47 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineComponent, ref } from 'vue';
-import { invoke } from '@tauri-apps/api/core';
-import AlertIcon from '../components/icons/AlertIcon.vue';
-import DataTable from '../components/DataTable.vue';
-import type { DataTableColumn } from '../components/DataTableColumn';
-import { useAppContext } from '../composables/useAppContext';
-import { useAutoDismiss } from '../composables/useAutoDismiss';
-import { useScripts } from '../services/script/import/useScripts';
-import { findMissingScriptIds } from '../services/script/scriptReconciliation';
-import { onMounted } from 'vue';
-import type { Script } from '../models/Script';
-import type { Task } from '../models/Task';
-import { useTimeAgo } from '@vueuse/core';
+import { computed, defineComponent, ref } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
+import AlertIcon from '../components/icons/AlertIcon.vue'
+import DataTable from '../components/DataTable.vue'
+import type { DataTableColumn } from '../components/DataTableColumn'
+import { useAppContext } from '../composables/useAppContext'
+import { useAutoDismiss } from '../composables/useAutoDismiss'
+import { useScripts } from '../services/script/import/useScripts'
+import { findMissingScriptIds } from '../services/script/scriptReconciliation'
+import { onMounted } from 'vue'
+import type { Script } from '../models/Script'
+import type { Task } from '../models/Task'
+import { useTimeAgo } from '@vueuse/core'
 
 const RelativeTime = defineComponent({
   props: {
     date: { type: String, required: true },
   },
   setup(props) {
-    const timeAgo = useTimeAgo(props.date);
-    return () => timeAgo.value;
+    const timeAgo = useTimeAgo(props.date)
+    return () => timeAgo.value
   },
-});
+})
 
-const { scriptRepository: repository, picker, scanner, taskRepository, taskScheduler, scriptPathChecker, venvSync } = useAppContext();
+const {
+  scriptRepository: repository,
+  picker,
+  scanner,
+  taskRepository,
+  taskScheduler,
+  scriptPathChecker,
+  venvSync,
+} = useAppContext()
 
-const { scripts, error, busy, addScriptFile, addScriptFolder, load } = useScripts({ repository, picker, scanner });
-const missingScriptIds = ref<string[]>([]);
+const { scripts, error, busy, addScriptFile, addScriptFolder, load } = useScripts({ repository, picker, scanner })
+const missingScriptIds = ref<string[]>([])
 
 const columns: DataTableColumn<Script>[] = [
   { key: 'name', label: 'Name', sortable: true, searchable: true },
   { key: 'path', label: 'Path', sortable: false, searchable: true },
-  { key: 'status', label: 'Status', sortable: false, searchable: false },
+  { key: 'status', label: 'Status', sortable: true, searchable: false },
   {
     key: 'created',
     label: 'Created',
@@ -215,72 +309,72 @@ const columns: DataTableColumn<Script>[] = [
     cellTitle: (s) => s.createdAt,
   },
   { key: 'actions', label: 'Actions', sortable: false, searchable: false },
-];
+]
 
-const usedScriptIds = ref<Set<string>>(new Set());
+const usedScriptIds = ref<Set<string>>(new Set())
 
 async function loadAndReconcile() {
-  await load();
-  missingScriptIds.value = await findMissingScriptIds(scripts.value, scriptPathChecker.exists);
+  await load()
+  missingScriptIds.value = await findMissingScriptIds(scripts.value, scriptPathChecker.exists)
   // Load tasks to determine used/unused status per script
   try {
-    const tasks = await taskRepository.list();
-    usedScriptIds.value = new Set(tasks.map(t => t.scriptId));
+    const tasks = await taskRepository.list()
+    usedScriptIds.value = new Set(tasks.map((t) => t.scriptId))
   } catch {
-    usedScriptIds.value = new Set();
+    usedScriptIds.value = new Set()
   }
 }
 
-const operationSummary = ref('');
-const repairError = ref('');
-useAutoDismiss(error);
-useAutoDismiss(operationSummary);
-useAutoDismiss(repairError);
-const summary = computed(() => operationSummary.value);
+const operationSummary = ref('')
+const repairError = ref('')
+useAutoDismiss(error)
+useAutoDismiss(operationSummary)
+useAutoDismiss(repairError)
+const summary = computed(() => operationSummary.value)
 
 // Edit state and refs
-const selectedScript = ref<Script | null>(null);
-const editName = ref('');
-const editDescription = ref('');
-const editPythonVersion = ref('3.11');
-const isEditing = ref(false);
-const editError = ref<string | null>(null);
+const selectedScript = ref<Script | null>(null)
+const editName = ref('')
+const editDescription = ref('')
+const editPythonVersion = ref('3.11')
+const isEditing = ref(false)
+const editError = ref<string | null>(null)
 
 // Delete state
-const deleteTarget = ref<Script | null>(null);
-const linkedTasks = ref<Task[]>([]);
-const deleteError = ref('');
+const deleteTarget = ref<Script | null>(null)
+const linkedTasks = ref<Task[]>([])
+const deleteError = ref('')
 
 // Deps scan state
-const pendingDeps = ref<{ folder: string; script: Script; detected: string[] } | null>(null);
+const pendingDeps = ref<{ folder: string; script: Script; detected: string[] } | null>(null)
 
 // Edit dialog handlers
 function openEditDialog(script: Script) {
-  selectedScript.value = script;
-  editName.value = script.name;
-  editDescription.value = script.description ?? '';
-  editPythonVersion.value = script.pythonVersion ?? '3.11';
-  editError.value = null;
-  operationSummary.value = '';
-  isEditing.value = true;
+  selectedScript.value = script
+  editName.value = script.name
+  editDescription.value = script.description ?? ''
+  editPythonVersion.value = script.pythonVersion ?? '3.11'
+  editError.value = null
+  operationSummary.value = ''
+  isEditing.value = true
 }
 
 function closeEditDialog() {
-  isEditing.value = false;
-  selectedScript.value = null;
-  editError.value = null;
+  isEditing.value = false
+  selectedScript.value = null
+  editError.value = null
 }
 
 async function saveEdit() {
-  if (!selectedScript.value) return;
+  if (!selectedScript.value) return
 
-  editError.value = null;
+  editError.value = null
 
   // Trim name and reject empty
-  const trimmedName = editName.value.trim();
+  const trimmedName = editName.value.trim()
   if (!trimmedName) {
-    editError.value = 'Script name cannot be empty.';
-    return;
+    editError.value = 'Script name cannot be empty.'
+    return
   }
 
   try {
@@ -288,195 +382,204 @@ async function saveEdit() {
       name: trimmedName,
       description: editDescription.value.trim(),
       pythonVersion: editPythonVersion.value,
-    });
+    })
     // Sync venv for the folder (pythonVersion or requirements.txt may have changed)
-    await venvSync.syncFolder(selectedScript.value.path, editPythonVersion.value);
-    await loadAndReconcile();
-    closeEditDialog();
-    operationSummary.value = `Updated ${trimmedName}.`;
+    await venvSync.syncFolder(selectedScript.value.path, editPythonVersion.value)
+    await loadAndReconcile()
+    closeEditDialog()
+    operationSummary.value = `Updated ${trimmedName}.`
   } catch (e) {
-    editError.value = typeof e === 'string' && e.trim() ? e : e instanceof Error ? e.message : 'Failed to update script.';
+    editError.value =
+      typeof e === 'string' && e.trim() ? e : e instanceof Error ? e.message : 'Failed to update script.'
   }
 }
 
 async function handleDelete(script: Script) {
-  if (!script) return;
+  if (!script) return
 
-  deleteError.value = '';
+  deleteError.value = ''
   // Collect tasks that reference this script so the dialog can warn and
   // cascade deletion of the linked Windows tasks.
   try {
-    const tasks = await taskRepository.list();
-    linkedTasks.value = tasks.filter(task => task.scriptId === script.id);
+    const tasks = await taskRepository.list()
+    linkedTasks.value = tasks.filter((task) => task.scriptId === script.id)
   } catch {
-    linkedTasks.value = [];
+    linkedTasks.value = []
   }
-  deleteTarget.value = script;
+  deleteTarget.value = script
 }
 
 function cancelDelete() {
-  deleteTarget.value = null;
-  linkedTasks.value = [];
-  deleteError.value = '';
+  deleteTarget.value = null
+  linkedTasks.value = []
+  deleteError.value = ''
 }
 
 async function confirmDelete() {
-  const target = deleteTarget.value;
-  if (!target) return;
+  const target = deleteTarget.value
+  if (!target) return
 
   try {
     // Cascade: remove linked tasks (JSON + Windows registration) first so no
     // orphaned Windows task keeps running a deleted script, then the script.
     for (const task of linkedTasks.value) {
-      await taskRepository.delete(task.id);
-      await taskScheduler.delete(task.id);
+      await taskRepository.delete(task.id)
+      await taskScheduler.delete(task.id)
     }
-    const deletePath = target.path;
-    await repository.delete(target.id);
+    const deletePath = target.path
+    await repository.delete(target.id)
     // Cleanup venv — if no more scripts in this folder, venv is removed
-    await venvSync.cleanupFolder(deletePath);
-    await loadAndReconcile();
+    await venvSync.cleanupFolder(deletePath)
+    await loadAndReconcile()
 
-    operationSummary.value = linkedTasks.value.length > 0
-      ? `Deleted ${target.name} and ${linkedTasks.value.length} linked task(s).`
-      : `Deleted ${target.name}.`;
-    deleteTarget.value = null;
-    linkedTasks.value = [];
-    deleteError.value = '';
+    operationSummary.value =
+      linkedTasks.value.length > 0
+        ? `Deleted ${target.name} and ${linkedTasks.value.length} linked task(s).`
+        : `Deleted ${target.name}.`
+    deleteTarget.value = null
+    linkedTasks.value = []
+    deleteError.value = ''
   } catch (e) {
     // Keep the dialog open so the error is visible; nothing was committed.
-    deleteError.value = typeof e === 'string' && e.trim() ? e : e instanceof Error ? e.message : 'Failed to delete script.';
+    deleteError.value =
+      typeof e === 'string' && e.trim() ? e : e instanceof Error ? e.message : 'Failed to delete script.'
   }
 }
 
 function scriptDir(path: string): string {
-  const normalized = path.replace(/\\/g, '/');
-  const index = normalized.lastIndexOf('/');
-  return index === -1 ? path : normalized.slice(0, index);
+  const normalized = path.replace(/\\/g, '/')
+  const index = normalized.lastIndexOf('/')
+  return index === -1 ? path : normalized.slice(0, index)
 }
 
 async function confirmDeps() {
-  if (!pendingDeps.value) return;
-  const { folder, script, detected } = pendingDeps.value;
-  pendingDeps.value = null;
+  if (!pendingDeps.value) return
+  const { folder, script, detected } = pendingDeps.value
+  pendingDeps.value = null
   try {
     // Check for pyproject.toml — if present, use uv sync (project mode)
-    const hasPyproject = await invoke<boolean>('path_exists', { path: folder + '/pyproject.toml' });
+    const hasPyproject = await invoke<boolean>('path_exists', { path: folder + '/pyproject.toml' })
     if (hasPyproject) {
-      await invoke('ensure_script_venv', { dirPath: folder, pythonVersion: script.pythonVersion ?? '3.11' });
-      await invoke('uv_sync_project', { dirPath: folder, pythonVersion: script.pythonVersion ?? '3.11' });
-      operationSummary.value = `Synced uv project in ${folder} with ${detected.length} dep(s).`;
+      await invoke('ensure_script_venv', { dirPath: folder, pythonVersion: script.pythonVersion ?? '3.11' })
+      await invoke('uv_sync_project', { dirPath: folder, pythonVersion: script.pythonVersion ?? '3.11' })
+      operationSummary.value = `Synced uv project in ${folder} with ${detected.length} dep(s).`
     } else {
-      await invoke('write_requirements_txt', { dirPath: folder, deps: detected });
+      await invoke('write_requirements_txt', { dirPath: folder, deps: detected })
       // Ensure the venv exists in the script folder for this folder's pythonVersion
-      await invoke('ensure_script_venv', { dirPath: folder, pythonVersion: script.pythonVersion ?? '3.11' });
+      await invoke('ensure_script_venv', { dirPath: folder, pythonVersion: script.pythonVersion ?? '3.11' })
       // Sync the deps from requirements.txt into the venv
-      await invoke('sync_script_deps', { dirPath: folder, requirements: detected });
-      operationSummary.value = `Created requirements.txt with ${detected.length} dep(s).`;
+      await invoke('sync_script_deps', { dirPath: folder, requirements: detected })
+      operationSummary.value = `Created requirements.txt with ${detected.length} dep(s).`
     }
   } catch (e) {
-    error.value = typeof e === 'string' && e.trim() ? e : e instanceof Error ? e.message : 'Failed to process dependencies.';
+    error.value =
+      typeof e === 'string' && e.trim() ? e : e instanceof Error ? e.message : 'Failed to process dependencies.'
   }
 }
 
 function skipDeps() {
-  if (!pendingDeps.value) return;
-  const { script } = pendingDeps.value;
-  pendingDeps.value = null;
+  if (!pendingDeps.value) return
+  const { script } = pendingDeps.value
+  pendingDeps.value = null
   // Still sync venv (with empty deps) so the venv is ready for future use
-  venvSync.syncFolder(script.path, script.pythonVersion ?? '3.11').catch(() => {});
-  operationSummary.value = 'Skipped dependency scan.';
+  venvSync.syncFolder(script.path, script.pythonVersion ?? '3.11').catch(() => {})
+  operationSummary.value = 'Skipped dependency scan.'
 }
 
 async function handleAddFile() {
-  const result = await addScriptFile();
+  const result = await addScriptFile()
   if (result.added > 0) {
     // Auto-scan for deps on newly added scripts
     for (const s of scripts.value) {
       try {
-        const folder = scriptDir(s.path);
+        const folder = scriptDir(s.path)
         // If pyproject.toml exists, this is a uv project — skip deps scan, just sync
-        const hasPyproject = await invoke<boolean>('path_exists', { path: folder + '/pyproject.toml' });
+        const hasPyproject = await invoke<boolean>('path_exists', { path: folder + '/pyproject.toml' })
         if (hasPyproject) {
-          await venvSync.syncFolder(s.path, s.pythonVersion ?? '3.11');
-          continue;
+          await venvSync.syncFolder(s.path, s.pythonVersion ?? '3.11')
+          continue
         }
-        const existing = await invoke<string[]>('read_folder_requirements', { dirPath: folder });
+        const existing = await invoke<string[]>('read_folder_requirements', { dirPath: folder })
         if (existing.length === 0) {
-          const detected = await invoke<string[]>('scan_script_deps', { filePath: s.path });
+          const detected = await invoke<string[]>('scan_script_deps', { filePath: s.path })
           if (detected.length > 0) {
-            pendingDeps.value = { folder, script: s, detected };
-            return; // Show modal first — venv sync happens after confirm
+            pendingDeps.value = { folder, script: s, detected }
+            return // Show modal first — venv sync happens after confirm
           }
         }
-        await venvSync.syncFolder(s.path, s.pythonVersion ?? '3.11');
-      } catch { /* skip errors on add */ }
+        await venvSync.syncFolder(s.path, s.pythonVersion ?? '3.11')
+      } catch {
+        /* skip errors on add */
+      }
     }
   }
-  operationSummary.value = `Added ${result.added} script(s), skipped ${result.skipped}.`;
+  operationSummary.value = `Added ${result.added} script(s), skipped ${result.skipped}.`
 }
 
 async function handleAddFolder() {
-  const result = await addScriptFolder();
+  const result = await addScriptFolder()
   if (result.added > 0) {
     for (const s of scripts.value) {
       try {
-        const folder = scriptDir(s.path);
+        const folder = scriptDir(s.path)
         // If pyproject.toml exists, this is a uv project — skip deps scan
-        const hasPyproject = await invoke<boolean>('path_exists', { path: folder + '/pyproject.toml' });
+        const hasPyproject = await invoke<boolean>('path_exists', { path: folder + '/pyproject.toml' })
         if (hasPyproject) {
-          await venvSync.syncFolder(s.path, s.pythonVersion ?? '3.11');
-          continue;
+          await venvSync.syncFolder(s.path, s.pythonVersion ?? '3.11')
+          continue
         }
-        const existing = await invoke<string[]>('read_folder_requirements', { dirPath: folder });
+        const existing = await invoke<string[]>('read_folder_requirements', { dirPath: folder })
         if (existing.length === 0) {
-          const detected = await invoke<string[]>('scan_script_deps', { filePath: s.path });
+          const detected = await invoke<string[]>('scan_script_deps', { filePath: s.path })
           if (detected.length > 0) {
-            pendingDeps.value = { folder, script: s, detected };
-            return;
+            pendingDeps.value = { folder, script: s, detected }
+            return
           }
         }
-        await venvSync.syncFolder(s.path, s.pythonVersion ?? '3.11');
-      } catch { /* skip */ }
+        await venvSync.syncFolder(s.path, s.pythonVersion ?? '3.11')
+      } catch {
+        /* skip */
+      }
     }
   }
-  operationSummary.value = `Added ${result.added} script(s), skipped ${result.skipped}.`;
+  operationSummary.value = `Added ${result.added} script(s), skipped ${result.skipped}.`
 }
 
 async function handleRefresh() {
-  await loadAndReconcile();
+  await loadAndReconcile()
 }
 
 function fileName(path: string): string {
-  return path.replace(/\\/g, '/').split('/').pop() ?? path;
+  return path.replace(/\\/g, '/').split('/').pop() ?? path
 }
 
 async function handleRepair(script: Script) {
-  repairError.value = '';
-  const selectedPath = await picker.pickFile();
-  if (!selectedPath) return;
+  repairError.value = ''
+  const selectedPath = await picker.pickFile()
+  if (!selectedPath) return
 
   if (fileName(selectedPath).toLowerCase() !== fileName(script.name).toLowerCase()) {
-    repairError.value = 'Script did not match';
-    return;
+    repairError.value = 'Script did not match'
+    return
   }
 
   try {
-    const updatedScript = await repository.update(script.id, { path: selectedPath });
+    const updatedScript = await repository.update(script.id, { path: selectedPath })
     // Sync venv for the new path's folder (requirements.txt might differ)
-    await venvSync.syncFolder(selectedPath, updatedScript.pythonVersion ?? '3.11');
-    const linkedTasks = (await taskRepository.list()).filter((task) => task.scriptId === script.id);
+    await venvSync.syncFolder(selectedPath, updatedScript.pythonVersion ?? '3.11')
+    const linkedTasks = (await taskRepository.list()).filter((task) => task.scriptId === script.id)
     for (const task of linkedTasks) {
-      await taskScheduler.update(task, updatedScript);
+      await taskScheduler.update(task, updatedScript)
     }
-    await loadAndReconcile();
-    operationSummary.value = `Repaired ${script.name}.`;
+    await loadAndReconcile()
+    operationSummary.value = `Repaired ${script.name}.`
   } catch (e) {
-    repairError.value = typeof e === 'string' && e.trim() ? e : e instanceof Error ? e.message : 'Failed to repair script.';
+    repairError.value =
+      typeof e === 'string' && e.trim() ? e : e instanceof Error ? e.message : 'Failed to repair script.'
   }
 }
 
 onMounted(async () => {
-  await loadAndReconcile();
-});
+  await loadAndReconcile()
+})
 </script>

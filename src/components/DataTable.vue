@@ -187,16 +187,16 @@ function rowKeyOf(row: any, index: number): string {
           <tr>
             <th v-for="col in columns" :key="col.key" :class="col.headerClass">
               <button
-                v-if="col.sortable"
                 type="button"
-                class="btn btn-ghost btn-xs gap-1 normal-case"
-                :data-testid="`data-table-sort-${col.key}`"
+                class="btn btn-ghost btn-sm gap-1 normal-case text-sm"
+                :class="!col.sortable ? 'disabled:text-neutral-950' : ''"
+                :disabled="!col.sortable"
+                :data-testid="col.sortable ? `data-table-sort-${col.key}` : undefined"
                 @click="toggleSort(col)"
               >
                 {{ col.label }}
-                <span class="sort-indicator" aria-hidden="true">{{ sortIndicator(col) }}</span>
+                <span v-if="col.sortable" class="sort-indicator" aria-hidden="true">{{ sortIndicator(col) }}</span>
               </button>
-              <span v-else>{{ col.label }}</span>
             </th>
           </tr>
         </thead>

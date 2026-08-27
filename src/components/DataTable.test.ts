@@ -164,6 +164,39 @@ describe('DataTable', () => {
     app.unmount()
   })
 
+  it('renders every header as a button, disabled for non-sortable columns', async () => {
+    const mixed: DataTableColumn<Row>[] = [
+      { key: 'name', label: 'Name', sortable: true, searchable: true },
+      { key: 'status', label: 'Status', sortable: false, searchable: true },
+    ]
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const app = createApp({
+      components: { DataTable },
+      render: () => h(DataTable as any, { rows: sampleRows.slice(0, 3), columns: mixed }),
+    })
+    app.mount(container)
+    await nextTick()
+
+    // Every header is a button, not a plain span.
+    const headerButtons = Array.from(container.querySelectorAll('thead th button'))
+    expect(headerButtons).toHaveLength(2)
+
+    // Sortable column: enabled and carries the sort testid.
+    const sortableBtn = container.querySelector('[data-testid="data-table-sort-name"]') as HTMLButtonElement
+    expect(sortableBtn).toBeTruthy()
+    expect(sortableBtn.disabled).toBe(false)
+    expect(sortableBtn.textContent).toContain('Name')
+
+    // Non-sortable column: still a button, but disabled (unclickable) and without the sort testid.
+    const nonSortableBtn = container.querySelector('thead th button:not([data-testid])') as HTMLButtonElement
+    expect(nonSortableBtn).toBeTruthy()
+    expect(nonSortableBtn.disabled).toBe(true)
+    expect(nonSortableBtn.textContent).toContain('Status')
+
+    app.unmount()
+  })
+
   it('filters rows with case-insensitive search across searchable columns', async () => {
     const { container, app } = mountTable(sampleRows)
     await nextTick()

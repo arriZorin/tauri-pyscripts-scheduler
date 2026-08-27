@@ -53,7 +53,7 @@ src/
 ## Component behaviour (`src/components/DataTable.vue`)
 
 **Location:** props `:5-28` · defaults `:30-42` · state `:46-50` · computed
-pipeline `:71-98` · watchers `:100-106` · handlers `:108-136` · template `:141-257`
+pipeline `:77-101` · watchers `:106-112` · handlers `:114-138` · template `:145-262`
 
 State:
 
@@ -78,20 +78,23 @@ const paged = computed(() => sorted.value.slice((page.value - 1) * pageSize.valu
 1. Default sort = `initialSortKey` (or the first `sortable` column) ascending
    (`DataTable.vue:49-50`) — this reproduces each page's previous ordering, so
    tables render identically on mount.
-2. Clicking a sortable header toggles asc→desc→asc via `toggleSort`
-   (`DataTable.vue:108-121`); the active column shows `▲`/`▼` (`sortIndicator`).
+2. Every header renders as a `<button>` (`DataTable.vue:188-199`): sortable
+   columns are enabled, carry the `data-table-sort-<key>` testid, and toggle
+   asc→desc→asc via `toggleSort` (`DataTable.vue:114-122`); the active column
+   shows `▲`/`▼` (`sortIndicator`, `DataTable.vue:124-127`). Non-sortable
+   columns render as disabled buttons — unclickable and without a sort testid.
 3. Search filters case-insensitively across columns where `searchable !==
-   false` (`DataTable.vue:71-76`); typing resets to page 1
-   (`watch(search, …)`, `DataTable.vue:104-106`).
+   false` (`DataTable.vue:77-82`); typing resets to page 1
+   (`watch(search, …)`, `DataTable.vue:110-112`).
 4. Rows-per-page dropdown emits `update:pageSize` and resets to page 1
-   (`onPageSizeChange`, `DataTable.vue:123-128`).
+   (`onPageSizeChange`, `DataTable.vue:129-134`).
 5. Pagination renders prev/page/next with `btn-active` on the current page
-   (`DataTable.vue:224-250`); prev is disabled on page 1, next on the last page;
-   `page` is clamped when data shrinks (`DataTable.vue:100-102`).
+   (`DataTable.vue:224-260`); prev is disabled on page 1, next on the last page;
+   `page` is clamped when data shrinks (`DataTable.vue:106-108`).
 6. Empty state: full-width `<td>` showing `emptyMessage` when `paged.length === 0`
-   (`DataTable.vue:199`).
+   (`DataTable.vue:204`).
 7. Each `<tr>` carries a data-testid from the `rowTestid` prop, falling back to
-   `data-table-row` (`DataTable.vue:209`) — this is how pages keep their
+   `data-table-row` (`DataTable.vue:208`) — this is how pages keep their
    `*-row-${id}` selectors.
 
 Flow chain: `user types in search box → search.value → filtered → sorted → paged → <tbody>` · `user clicks header → toggleSort → sorted → paged`.
@@ -254,15 +257,16 @@ the badge styling and the `log-mode-badge` testid. The `log-empty-state` alert
 
 | Aspect | Status |
 |--------|--------|
-| Generic sortable/searchable/paginated table | ✅ `DataTable.vue:46-50,71-98,108-136,141-257` |
+| Generic sortable/searchable/paginated table | ✅ `DataTable.vue:46-50,77-101,114-138,145-262` |
 | Column contract + accessors | ✅ `DataTableColumn.ts:7-29` |
 | Scripts table | ✅ `ScriptsListView.vue:37-63,205-218` |
 | Task table | ✅ `TaskView.vue:544-579,481-487` |
 | Execution-history table (newest-first) | ✅ `TaskView.vue:595-609,489-495` — `initial-sort-dir="desc"` |
 | Logging table (newest-first) | ✅ `LoggingView.vue:82-96,17-24` — `initial-sort-dir="desc"` |
-| Row testids preserved | ✅ `rowTestid` prop (`DataTable.vue:25,209`) → `script-*`/`task-row-*`/`run-row-*`/`log-row-*` |
-| Empty states preserved | ✅ per-page `v-if` alerts + `emptyMessage` (`DataTable.vue:199`) |
-| Tests | ✅ `src/components/DataTable.test.ts` (19) — full suite 297 green |
+| Header as button (sortable enabled / non-sortable disabled) | ✅ `DataTable.vue:188-199` |
+| Row testids preserved | ✅ `rowTestid` prop (`DataTable.vue:25,208`) → `script-*`/`task-row-*`/`run-row-*`/`log-row-*` |
+| Empty states preserved | ✅ per-page `v-if` alerts + `emptyMessage` (`DataTable.vue:204`) |
+| Tests | ✅ `src/components/DataTable.test.ts` (20) — full suite 298 green |
 | Rust backend | ✅ none — zero `invoke()` calls; no new entries in `invoke_handler` (`lib.rs:508`) |
 
 **Conclusion:** A single reusable, dependency-free `DataTable` renders every

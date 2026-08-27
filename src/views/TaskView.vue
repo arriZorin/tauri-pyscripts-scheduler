@@ -482,7 +482,7 @@ const taskColumns: DataTableColumn<Task>[] = [
   { key: 'name', label: 'Name', sortable: true, searchable: true },
   { key: 'script', label: 'Script', sortable: true, searchable: true, value: (t) => scriptLabelOf(t.scriptId) },
   { key: 'schedule', label: 'Schedule', sortable: true, searchable: true, value: (t) => scheduleLabel(t.schedule) },
-  { key: 'status', label: 'Status', sortable: false, searchable: false },
+  { key: 'status', label: 'Status', sortable: true, searchable: false },
   { key: 'actions', label: 'Actions', sortable: false, searchable: false },
 ]
 
@@ -554,7 +554,7 @@ onMounted(() => {
         <template #status="{ row: t }">
           <span v-if="hasMissingScript(t.scriptId)" class="badge badge-error" data-testid="script-missing-badge">script_missing</span>
           <span v-else-if="isTaskMissing(t.id)" class="badge badge-warning" data-testid="scheduler-missing-badge">unregistered</span>
-          <span v-else class="badge" :class="t.enabled ? 'badge-success' : 'badge-ghost'">{{ t.enabled ? 'Enabled' : 'Disabled' }}</span>
+          <span v-else class="badge" :class="t.enabled ? 'badge-success' : 'badge-neutral badge-outline'">{{ t.enabled ? 'Enabled' : 'Disabled' }}</span>
         </template>
         <template #actions="{ row: t }">
           <div class="join">
